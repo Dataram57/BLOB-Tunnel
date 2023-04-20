@@ -1,8 +1,11 @@
 //config
 const serverPort = 80;
-const wsPort = 8080;
+const wsPort = 5701;
 const wsSecretKey = 'zaq1"WSX';
-//This is a tunnel
+
+//================================================================
+//#region requirements and consts
+
 console.clear();
 const http = require('http');
 const WebSocket = require('ws');
@@ -31,6 +34,17 @@ const GetMIME = (ext) => {
         return ExtMIME[ext];
     return "text/plain";
 }
+
+//#endregion
+
+//================================================================
+//#region PhusionPassenger
+
+if (typeof(PhusionPassenger) != 'undefined') {
+    PhusionPassenger.configure({ autoInstall: false });
+}
+
+//#endregion
 
 //================================================================
 //#region WebSocket server
@@ -132,7 +146,7 @@ const server = http.createServer((req, res) => {
                     wsSessions[i].send('next;');
                 }   
                 else
-                    res.write('wrong key');
+                    res.end('wrong key');
             }
             break;
         default:
@@ -148,8 +162,15 @@ const server = http.createServer((req, res) => {
     */
 });
 
-server.listen(serverPort, () => {
-    console.log('Server running on http://localhost:' + serverPort);
-});
+//consider PhusionPassenger existance
+if (typeof(PhusionPassenger) != 'undefined') {
+    server.listen('passenger');
+}else{
+    server.listen(serverPort, () => {
+        console.log('Server running on http://localhost:' + serverPort);
+    });
+}
+
+
 
 //#endregion
