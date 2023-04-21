@@ -1,5 +1,6 @@
 //config
-const targetTunnel = 'ws://backrooms.ethuardo.com:5701';
+const targetTunnel = //'ws:localhost';
+'wss://backrooms.ethuardo.com';
 const targetTunnelInviteLink = 'https://backrooms.ethuardo.com/download/';
 const tunnelSecretKey = 'zaq1"WSX';
 const targetFile = 'test.txt';

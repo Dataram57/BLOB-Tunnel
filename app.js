@@ -1,6 +1,6 @@
 //config
 const serverPort = 80;
-const wsPort = 5701;
+const wsPort = serverPort;
 const wsSecretKey = 'zaq1"WSX';
 
 //================================================================
@@ -47,9 +47,69 @@ if (typeof(PhusionPassenger) != 'undefined') {
 //#endregion
 
 //================================================================
+//#region HTTP server
+
+const server = http.createServer((req, res) => {
+    const params = req.url.split('/');
+    switch(params[1]){
+        case "download":
+            if(params[2]){
+                //find the id
+                let i = wsSessions.length;
+                const key = params[2];
+                while(--i > -1)
+                    if(wsSessionsKey[i] == key)
+                        break;
+                
+                if(i > -1){
+                    //susspend key
+                    wsSessionsKey[i] == null;
+                    wsSessionsResponse[i] = res;
+                    //write headers
+                    res.setHeader('Content-Type', GetMIME(wsSessionsFileName[i].substr(wsSessionsFileName[i].lastIndexOf('.') + 1)));
+                    res.setHeader('Content-Disposition', `attachment; filename="${wsSessionsFileName[i]}"`);
+                    res.setHeader('Content-Length', wsSessionsFileLength[i]);
+                    //begin responding;
+                    wsSessions[i].send('next;');
+                }   
+                else
+                    res.end('wrong key');
+            }
+            break;
+        default:
+            res.end('Hello. This is a tunnel');
+            break;
+    }
+    /*
+    const msg = "Hello. Can you read me?";
+    const fileName = "test.txt";
+    res.setHeader('Content-Type', GetMIME(fileName.substr(fileName.lastIndexOf('.') + 1)));
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.write(msg);
+    */
+});
+
+//consider PhusionPassenger existance
+if (typeof(PhusionPassenger) != 'undefined') {
+    server.listen('passenger', () => {
+        console.log('HTTP server running on passenger');
+    });
+}else{
+    server.listen(serverPort, () => {
+        console.log('HTTP server running on ' + serverPort);
+    });
+}
+
+
+
+//#endregion
+
+//================================================================
 //#region WebSocket server
 
-const wsServer = new WebSocket.Server({port: wsPort});
+const wsServer = new WebSocket.Server((wsPort == serverPort) ? {server: server} : {port: wsPort},() => {
+    console.log("WebSocket server running on " + (wsPort == serverPort) ? 'the same port as HTTP server' : wsPort);
+});
 
 const wsSessions = [];
 const wsSessionsKey = [];
@@ -116,61 +176,5 @@ wsServer.on('connection', (socket, req) => {
         }
     });
 });
-
-//#endregion
-
-//================================================================
-//#region HTTP server
-
-const server = http.createServer((req, res) => {
-    const params = req.url.split('/');
-    switch(params[1]){
-        case "download":
-            if(params[2]){
-                //find the id
-                let i = wsSessions.length;
-                const key = params[2];
-                while(--i > -1)
-                    if(wsSessionsKey[i] == key)
-                        break;
-                
-                if(i > -1){
-                    //susspend key
-                    wsSessionsKey[i] == null;
-                    wsSessionsResponse[i] = res;
-                    //write headers
-                    res.setHeader('Content-Type', GetMIME(wsSessionsFileName[i].substr(wsSessionsFileName[i].lastIndexOf('.') + 1)));
-                    res.setHeader('Content-Disposition', `attachment; filename="${wsSessionsFileName[i]}"`);
-                    res.setHeader('Content-Length', wsSessionsFileLength[i]);
-                    //begin responding;
-                    wsSessions[i].send('next;');
-                }   
-                else
-                    res.end('wrong key');
-            }
-            break;
-        default:
-            res.end('Hello. This is a tunnel');
-            break;
-    }
-    /*
-    const msg = "Hello. Can you read me?";
-    const fileName = "test.txt";
-    res.setHeader('Content-Type', GetMIME(fileName.substr(fileName.lastIndexOf('.') + 1)));
-    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-    res.write(msg);
-    */
-});
-
-//consider PhusionPassenger existance
-if (typeof(PhusionPassenger) != 'undefined') {
-    server.listen('passenger');
-}else{
-    server.listen(serverPort, () => {
-        console.log('Server running on http://localhost:' + serverPort);
-    });
-}
-
-
 
 //#endregion
