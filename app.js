@@ -107,9 +107,8 @@ if (typeof(PhusionPassenger) != 'undefined') {
 //================================================================
 //#region WebSocket server
 
-const wsServer = new WebSocket.Server((wsPort == serverPort) ? {server: server} : {port: wsPort},() => {
-    console.log("WebSocket server running on " + (wsPort == serverPort) ? 'the same port as HTTP server' : wsPort);
-});
+const wsServer = new WebSocket.Server((wsPort == serverPort) ? {server: server} : {port: wsPort});
+//() => {console.log("WebSocket server running on " + (wsPort == serverPort) ? 'the same port as HTTP server' : wsPort);}
 
 const wsSessions = [];
 const wsSessionsKey = [];
