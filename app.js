@@ -1,12 +1,21 @@
 //config
 const serverPort = 80;
+//WS server
 const wsPort = serverPort;
+const maxWSSessionCount = 32;
 const wsSecretKey = 'zaq1"WSX';
+const wsMaxPayLoad = 1024;
+//WS server delay checks
+const minLinkExpirationTime = 3 * 60 * 1000;
+const minWSMessageDelay = 30 * 1000;
+const checkWSConfigTime = 10 * 1000;
+const checkExpirationForAllTime = 30 * 1000; 
 
 //================================================================
 //#region requirements and consts
 
 console.clear();
+const appLaunchDate = new Date();
 const http = require('http');
 const WebSocket = require('ws');
 
@@ -54,27 +63,41 @@ const server = http.createServer((req, res) => {
     switch(params[1]){
         case "download":
             if(params[2]){
-                //find the id
-                let i = wsSessions.length;
+                //search for the corresponding socket
                 const key = params[2];
-                while(--i > -1)
-                    if(wsSessionsKey[i] == key)
+                let socket = chainHead_WSSession;
+                while(socket)
+                    if(socket._key == key)
                         break;
-                
-                if(i > -1){
+                    else
+                        socket = socket.chainFront;
+                //check searching result
+                if(socket){
                     //susspend key
-                    wsSessionsKey[i] == null;
-                    wsSessionsResponse[i] = res;
+                    RemoveWSSession(socket);
                     //write headers
-                    res.setHeader('Content-Type', GetMIME(wsSessionsFileName[i].substr(wsSessionsFileName[i].lastIndexOf('.') + 1)));
-                    res.setHeader('Content-Disposition', `attachment; filename="${wsSessionsFileName[i]}"`);
-                    res.setHeader('Content-Length', wsSessionsFileLength[i]);
+                    res.setHeader('Content-Type', GetMIME(socket._fileName.substr(socket._fileName.lastIndexOf('.') + 1)));
+                    res.setHeader('Content-Disposition', `attachment; filename="${socket._fileName}"`);
+                    res.setHeader('Content-Length', socket._fileLength);
                     //begin responding;
-                    wsSessions[i].send('next;');
-                }   
-                else
-                    res.end('wrong key');
+                    socket._response = res;
+                    socket.send('next;');
+                    return;
+                }
             }
+            //wrong key case
+            res.end('wrong key');
+            break;
+        case 'test':
+            let socket = chainHead_WSSession;
+            let i = wsSessionCounter;
+            while(socket){
+                res.write(i + '. ' + socket._key + "\n");
+                //next
+                i--;
+                socket = socket.chainFront;
+            }
+            res.end();
             break;
         default:
             res.end('Hello. This is a tunnel');
@@ -100,80 +123,194 @@ if (typeof(PhusionPassenger) != 'undefined') {
     });
 }
 
+//#endregion
 
+//================================================================
+//#region Session Managment (chain-type)
+
+let chainHead_WSSession = null;
+//obj.chainFront - to search for the last
+//obj.chainBack - to search for the top
+
+const RegisterWSSession = (session) => {
+    //set front and back
+    session.chainFront = chainHead_WSSession;
+    session.chainBack = null;
+    //change head (add on top)
+    chainHead_WSSession = session;
+    chainHead_WSSession.chainBack = session;
+};
+
+const RemoveWSSession = (session) => {
+    //check if head
+    if(session == chainHead_WSSession)
+        //neighbour becomes a new head
+        chainHead_WSSession = session.chainFront;
+    else
+        //tell the neighbour to target its neighbour
+        session.chainBack = session.chainFront 
+};
+
+const CloseAllWSSessions = () => {
+    let socket = chainHead_WSSession;
+    let next = null;
+    while(socket){
+        next = socket.chainFront;
+        socket.close();
+        socket = next;
+    }
+};
 
 //#endregion
 
 //================================================================
 //#region WebSocket server
 
-const wsServer = new WebSocket.Server((wsPort == serverPort) ? {server: server} : {port: wsPort});
+const wsServer = new WebSocket.Server(
+    (wsPort == serverPort) ? 
+        {
+            server: server
+            ,maxPayload: wsMaxPayLoad
+        }
+    : 
+        {
+            port: wsPort
+            ,maxPayload: wsMaxPayLoad
+        }
+);
 //() => {console.log("WebSocket server running on " + (wsPort == serverPort) ? 'the same port as HTTP server' : wsPort);}
 
-const wsSessions = [];
-const wsSessionsKey = [];
-const wsSessionsFileLength = [];
-const wsSessionsFileName = [];
-const wsSessionsChunkLength = [];
-const wsSessionsResponse = [];
-//
+let wsSessionCounter = 0;
 
 wsServer.on('connection', (socket, req) => {
-    //check key
-    if(req.headers['key'] !== wsSecretKey){
+    //check key and counter
+    if(req.headers['key'] !== wsSecretKey || wsSessionCounter >= maxWSSessionCount){
         socket.close();
         return;
     }
     console.log('New connection has been Approved');
 
     //save session
-    socket.sessionIndex = wsSessions.push(socket) - 1;
-    wsSessionsKey.push('');
-    wsSessionsFileLength.push(-1);
-    wsSessionsFileName.push('unnamed.thing');
-    wsSessionsChunkLength.push(0);
-    wsSessionsResponse.push(null);
-
-    //define events
+    wsSessionCounter++;
+    socket._key = "";
+    socket._fileLength = -1;
+    socket._fileName = 'unnamed.thing';
+    //usage ._chunkLength is mixed with setTimout returned id
+    socket._chunkLength = 0;
+    socket._response = null;
+    socket._lastMessageDate = new Date();
+    //define chain properties
+    socket.chainBack = null;
+    socket.chainFront = null;
 
     //on message
     socket.on("message", message => {
-        const i = socket.sessionIndex;
+        //update socket last message date
+        socket._lastMessageDate = new Date();
         //check status
-        if(wsSessionsFileLength[i] == -1){
+        if(!_response){
+            //correct or apply setup/config
             //get setup
             const setup = JSON.parse(message);
             //check setup
             console.log(setup);
             //set parameters
-            wsSessionsFileName[i] = setup.fileName;
-            wsSessionsFileLength[i] = setup.fileSize;
-            wsSessionsChunkLength[i] = setup.chunkLength;
+            socket._fileName = setup.fileName;
+            socket._fileLength = setup.fileSize;
+            socket._chunkLength = setup.chunkLength;
             //generate the key
-            const key = Math.floor(Math.random() * 100000).toString(16);
-            console.log(key);
-            wsSessionsKey[i] = key;
-            socket.send("key;" + key);
+            if(!socket.key){
+                const key = Math.floor(Math.random() * 100000).toString(16);
+                console.log(key);
+                socket._key = key;
+                socket.send("key;" + key);
+                //add to chain
+                RegisterWSSession(socket);
+            }
         }
         else{
             //write tunneled data to the responese
-            wsSessionsResponse[i].write(message);
+            socket._response.write(message);
             console.log(message.toString());
             //shrink file size
-            wsSessionsFileLength[i] -= message.length;
+            socket._fileLength -= message.length;
             //check remaining file size
-            if(wsSessionsFileLength[i] <= 0){
+            if(socket._fileLength <= 0){
                 console.log('finished writing data');
                 //end downloading
-                wsSessionsResponse[i].end();
+                socket._response.end();
                 //destroy ws
-                socket.close();
+                CloseSession(socket);
                 return;
             }
             //ask for next
             socket.send("next;");
         }
     });
+
+    //on close
+    socket.on("close",e => {
+        CloseSession(socket);
+    });
+
+    //on error
+    socket.on('error', err => {        
+        TerminateSession(socket);
+        //potential error codes(err.code):
+        //WS_ERR_UNSUPPORTED_MESSAGE_LENGTH
+    });
+    
+    
+    //hire self check
+    //socket._chunkLength = setTimeout(objClose, minWSConfigDelay, socket);
+
+
 });
+
+
+const DelistSession = (socket) => {
+    //safe check if it is listed
+    if(socket.chainBack != null || socket.chainFront != null)
+        RemoveWSSession(socket);
+};
+const CloseSession = (socket) => {
+    //check if it is listed
+    DelistSession(socket);
+    //destroy session
+    socket.close();
+    //stats
+    wsSessionCounter--;
+};
+const TerminateSession = (socket) => {
+    //check if it is listed
+    DelistSession(socket);
+    //destroy session
+    socket.terminate();
+    //stats
+    wsSessionCounter--;
+};
+
+const objClose = (obj) => {
+    obj.close();
+    obj = null;
+};
+//returns if the socket did stop responding
+//used for:
+//-checking delay in chunk delivery (called by the ???)
+//-checking key expiration date (called by the chain scanner event)
+//-checking delay in delivering config (called by the individual setTimout)
+const checkWSDelay = (socket) => {
+    //calculate the diffrence
+    const d = new Date() - socket._lastMessageDate;
+    //check socket state
+    if(socket._key)
+        //check expiration date
+        return d > minLinkExpirationTime;
+    else if(socket._fileName)
+        //check delay in chunk delivery
+        return d > minWSMessageDelay;
+    //check delay in config delivery
+    return d > minWSConfigDelay;
+};
 
 //#endregion
