@@ -1,12 +1,27 @@
 <!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Document</title>
-    </head>
-    <body>
-        <input type="text">
-    </body>
+<html>
+  <head>
+    <title>File Loader</title>
+  </head>
+  <body>
+    <h1>Select a file to load</h1>
+    <input type="file" id="file-selector" onchange="loadFile()">
+    <pre id="file-content"></pre>
+    <script>
+      function loadFile() {
+        var fileSelector = document.getElementById('file-selector');
+        var file = fileSelector.files[0];
+        var reader = new FileReader();
+        reader.onload = function(event) {
+          var fileContent = event.target.result;
+          var fileChunks = [];
+          for (var i = 0; i < fileContent.length; i += 64) {
+            fileChunks.push(fileContent.substr(i, 64));
+          }
+          document.getElementById('file-content').textContent = fileChunks.join('\n');
+        };
+        reader.readAsBinaryString(file);
+      }
+    </script>
+  </body>
 </html>
