@@ -11,7 +11,6 @@ console.clear();
 console.log('================================================================');
 const WebSocket = require('ws');
 const fs = require("fs");
-//start
 
 //================================================================
 //#region pseudo Main

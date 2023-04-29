@@ -11,16 +11,33 @@
       function loadFile() {
         var fileSelector = document.getElementById('file-selector');
         var file = fileSelector.files[0];
-        var reader = new FileReader();
-        reader.onload = function(event) {
-          var fileContent = event.target.result;
-          var fileChunks = [];
-          for (var i = 0; i < fileContent.length; i += 64) {
-            fileChunks.push(fileContent.substr(i, 64));
+        var fileReader = new FileReader();
+        var offset = 0;
+        var chunkSize = 64;
+        var fileSize = file.size;
+        var chunks = [];
+
+        fileReader.onload = function() {
+          var chunk = new Uint8Array(fileReader.result);
+          var chunkStr = '';
+          for (var i = 0; i < chunk.length; i++) {
+            chunkStr += String.fromCharCode(chunk[i]);
           }
-          document.getElementById('file-content').textContent = fileChunks.join('\n');
+          chunks.push(chunkStr);
+          offset += chunkSize;
+          if (offset < fileSize) {
+            readSlice(offset, chunkSize);
+          } else {
+            document.getElementById('file-content').textContent = chunks.join('');
+          }
         };
-        reader.readAsBinaryString(file);
+
+        function readSlice(start, size) {
+          var slice = file.slice(start, start + size);
+          fileReader.readAsArrayBuffer(slice);
+        }
+
+        readSlice(0, chunkSize);
       }
     </script>
   </body>

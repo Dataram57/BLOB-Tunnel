@@ -1,23 +1,41 @@
+/*================================================================
+This application is a tunnel between the private servers and the outside client.
+It is possible to:
+-Create a download link, which would work as a tunnel between the private server and the outside client.
+
+It is not yet possible to:
+-Create a WebSocket connection to transfer/upload outside client's file to a private server, through this service.
+
+//================================================================*/
 //config
 const serverPort = 80;
 //WS server
 const wsPort = serverPort;
-const maxWSSessionCount = 32;
+const wsSessionMaxCount = 32;
 const wsSecretKey = 'zaq1"WSX';
 const wsMaxPayLoad = 1024;
+//Download Service
+const downloadServiceSecretKey = 'zaq1"WSX';
+const downloadSessionKeyLength = 16;
+const downloadSessionMaxCount = 16;
+//Upload Service
+const uploadServiceSecretKey = 'ZAQ!2wsx';
+const uploadSessionKeyLength = 16;
+const uploadSessionMaxCount = 16;
 //WS server delay checks
 const minLinkExpirationTime = 3 * 60 * 1000;
 const minWSMessageDelay = 30 * 1000;
 const checkWSConfigTime = 10 * 1000;
-const checkExpirationForAllTime = 30 * 1000; 
+const checkExpirationForAllTime = 30 * 1000;
 
 //================================================================
-//#region requirements and consts
+//#region requirements and consts/utilities
 
 console.clear();
 const appLaunchDate = new Date();
 const http = require('http');
 const WebSocket = require('ws');
+const ChainArray = require('./ChainArray.js');
 
 const ExtMIME = {
     "jpg": "image/jpeg",
@@ -44,6 +62,15 @@ const GetMIME = (ext) => {
     return "text/plain";
 }
 
+const GenerateKey = (length) => {
+    //declare var
+    let key = '';
+    //generate
+    while(length-- > 0)
+        key += String.fromCharCode(65 + Math.floor(25 * Math.random()));
+    return key;
+};
+
 //#endregion
 
 //================================================================
@@ -62,10 +89,10 @@ const server = http.createServer((req, res) => {
     const params = req.url.split('/');
     switch(params[1]){
         case "download":
-            if(params[2]){
+            if(CheckDownloadKey(params[2])){
                 //search for the corresponding socket
                 const key = params[2];
-                let socket = chainHead_WSSession;
+                let socket = downloadSessionChain.head;
                 while(socket)
                     if(socket._key == key)
                         break;
@@ -74,13 +101,13 @@ const server = http.createServer((req, res) => {
                 //check searching result
                 if(socket){
                     //susspend key
-                    RemoveWSSession(socket);
+                    downloadSessionChain.Remove(socket);
                     //write headers
                     res.setHeader('Content-Type', GetMIME(socket._fileName.substr(socket._fileName.lastIndexOf('.') + 1)));
                     res.setHeader('Content-Disposition', `attachment; filename="${socket._fileName}"`);
                     res.setHeader('Content-Length', socket._fileLength);
                     //begin responding;
-                    socket._response = res;
+                    socket._client = res;
                     socket.send('next;');
                     return;
                 }
@@ -89,12 +116,12 @@ const server = http.createServer((req, res) => {
             res.end('wrong key');
             break;
         case 'test':
-            let socket = chainHead_WSSession;
-            let i = wsSessionCounter;
+            let socket = downloadSessionChain.head;
+            let i = 0;
             while(socket){
                 res.write(i + '. ' + socket._key + "\n");
                 //next
-                i--;
+                i++;
                 socket = socket.chainFront;
             }
             res.end();
@@ -133,12 +160,13 @@ let chainHead_WSSession = null;
 //obj.chainBack - to search for the top
 
 const RegisterWSSession = (session) => {
-    //set front and back
+    //set front(to target the old head) and back
     session.chainFront = chainHead_WSSession;
     session.chainBack = null;
+    //inform the old head
+    chainHead_WSSession.chainBack = session;
     //change head (add on top)
     chainHead_WSSession = session;
-    chainHead_WSSession.chainBack = session;
 };
 
 const RemoveWSSession = (session) => {
@@ -164,7 +192,21 @@ const CloseAllWSSessions = () => {
 //#endregion
 
 //================================================================
+
+
+const downloadSessionChain = new ChainArray();
+const uploadSessionChain = new ChainArray();
+
+//================================================================
 //#region WebSocket server
+
+const CheckDownloadKey = (key) => {
+    if(typeof(key) == 'string')
+        return downloadSessionKeyLength == key.length;
+    return false;
+}
+
+const GenerateDownloadKey = () => GenerateKey(downloadSessionKeyLength);
 
 const wsServer = new WebSocket.Server(
     (wsPort == serverPort) ? 
@@ -184,7 +226,7 @@ let wsSessionCounter = 0;
 
 wsServer.on('connection', (socket, req) => {
     //check key and counter
-    if(req.headers['key'] !== wsSecretKey || wsSessionCounter >= maxWSSessionCount){
+    if(req.headers['key'] !== downloadServiceSecretKey || wsSessionCounter >= wsSessionMaxCount){
         socket.close();
         return;
     }
@@ -197,7 +239,7 @@ wsServer.on('connection', (socket, req) => {
     socket._fileName = 'unnamed.thing';
     //usage ._chunkLength is mixed with setTimout returned id
     socket._chunkLength = 0;
-    socket._response = null;
+    socket._client = null;
     socket._lastMessageDate = new Date();
     //define chain properties
     socket.chainBack = null;
@@ -208,7 +250,7 @@ wsServer.on('connection', (socket, req) => {
         //update socket last message date
         socket._lastMessageDate = new Date();
         //check status
-        if(!_response){
+        if(!socket._client){
             //correct or apply setup/config
             //get setup
             const setup = JSON.parse(message);
@@ -220,17 +262,17 @@ wsServer.on('connection', (socket, req) => {
             socket._chunkLength = setup.chunkLength;
             //generate the key
             if(!socket.key){
-                const key = Math.floor(Math.random() * 100000).toString(16);
+                const key = GenerateDownloadKey();
                 console.log(key);
                 socket._key = key;
                 socket.send("key;" + key);
                 //add to chain
-                RegisterWSSession(socket);
+                downloadSessionChain.Add(socket);
             }
         }
         else{
             //write tunneled data to the responese
-            socket._response.write(message);
+            socket._client.write(message);
             console.log(message.toString());
             //shrink file size
             socket._fileLength -= message.length;
@@ -238,7 +280,7 @@ wsServer.on('connection', (socket, req) => {
             if(socket._fileLength <= 0){
                 console.log('finished writing data');
                 //end downloading
-                socket._response.end();
+                socket._client.end();
                 //destroy ws
                 CloseSession(socket);
                 return;
@@ -271,7 +313,7 @@ wsServer.on('connection', (socket, req) => {
 const DelistSession = (socket) => {
     //safe check if it is listed
     if(socket.chainBack != null || socket.chainFront != null)
-        RemoveWSSession(socket);
+        downloadSessionChain.Remove(socket);
 };
 const CloseSession = (socket) => {
     //check if it is listed
