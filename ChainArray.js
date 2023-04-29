@@ -3,7 +3,7 @@
 //.chainFront - reference to next neigbour element
 //.chainBack - reference to last neighbour element
 //element is not wrapped into another object (danger for parameters collision)
-//element is not checked if it is a null (danger for counting)(should alwyas be removed from the chain, before becoming a a null)
+//element is not checked if it is a null (danger for counting)(should alwyas be removed from the chain, before becoming a null)
 class ChainArray {
     constructor(){
         this.head = null;
@@ -42,9 +42,18 @@ class ChainArray {
             if(obj.chainFront)
                 //obj is not last
                 obj.chainFront.chainBack = obj.chainBack;
-        }else
+        }else{
             //obj is a head
-            this.head = obj.chainFront;
+            //check if not last
+            if(obj.chainFront){
+                //obj is not last
+                this.head = obj.chainFront;
+                //(skip reading old pointer's data)
+                this.head.chainBack = null;
+            }else
+                //obj is the head and the last, meaning that the count is equal to 1
+                this.head = null;
+        }
         //return length
         return --this.length;
     }

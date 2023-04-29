@@ -115,7 +115,11 @@ const server = http.createServer((req, res) => {
             let socket = downloadSessionChain.head;
             let i = 0;
             while(socket){
-                res.write(i + '. ' + socket._key + "\n");
+                res.write('\n'+i + '. ' + socket._key);
+                if(socket.chainBack)
+                    res.write(' Back: ' + socket.chainBack._key);
+                if(socket.chainFront)
+                    res.write(' Front: ' + socket.chainFront._key);
                 //next
                 i++;
                 socket = socket.chainFront;
@@ -211,7 +215,7 @@ const SetupDownloadSocket = (socket) => {
         else{
             //write tunneled data to the responese
             socket._client.write(message);
-            console.log(message.toString());
+            //console.log(message.toString());
             //shrink file size
             socket._fileLength -= message.length;
             //check remaining file size
@@ -221,8 +225,7 @@ const SetupDownloadSocket = (socket) => {
                 socket._client.end();
                 //destroy ws
                 //socket was removed from the chain earlier
-                socket.close();
-                return;
+                socket.terminate();
             }
             //ask for next
             socket.send("next;");
