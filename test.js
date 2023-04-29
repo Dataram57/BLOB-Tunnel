@@ -4,7 +4,7 @@ const targetTunnel = 'ws:localhost';
 const targetTunnelInviteLink = 'http://localhost/download/';
 //'https://backrooms.ethuardo.com/download/';
 const tunnelSecretKey = 'zaq1"WSX';
-const targetFile = 'test.txt';
+const targetFile = 'test.gif';
 const readChunkSize = 1024;
 //This is a tunnel-tester
 console.clear();

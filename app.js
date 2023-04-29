@@ -7,11 +7,10 @@ It is not yet possible to:
 -Create a WebSocket connection to transfer/upload outside client's file to a private server, through this service.
 
 //================================================================*/
-//config
+//#region Config
 const serverPort = 80;
 //WS server
 const wsPort = serverPort;
-const wsSessionMaxCount = 32;
 const wsSecretKey = 'zaq1"WSX';
 const wsMaxPayLoad = 1024;
 //Download Service
@@ -28,8 +27,10 @@ const minWSMessageDelay = 30 * 1000;
 const checkWSConfigTime = 10 * 1000;
 const checkExpirationForAllTime = 30 * 1000;
 
+//#endregion
+
 //================================================================
-//#region requirements and consts/utilities
+//#region Requirements and consts/utilities
 
 console.clear();
 const appLaunchDate = new Date();
@@ -92,15 +93,10 @@ const server = http.createServer((req, res) => {
             if(CheckDownloadKey(params[2])){
                 //search for the corresponding socket
                 const key = params[2];
-                let socket = downloadSessionChain.head;
-                while(socket)
-                    if(socket._key == key)
-                        break;
-                    else
-                        socket = socket.chainFront;
+                let socket = FindDownloadSession(key);
                 //check searching result
                 if(socket){
-                    //susspend key
+                    //Remove socket from the chain
                     downloadSessionChain.Remove(socket);
                     //write headers
                     res.setHeader('Content-Type', GetMIME(socket._fileName.substr(socket._fileName.lastIndexOf('.') + 1)));
@@ -153,95 +149,37 @@ if (typeof(PhusionPassenger) != 'undefined') {
 //#endregion
 
 //================================================================
-//#region Session Managment (chain-type)
+//#region WS - Download service
 
-let chainHead_WSSession = null;
-//obj.chainFront - to search for the last
-//obj.chainBack - to search for the top
-
-const RegisterWSSession = (session) => {
-    //set front(to target the old head) and back
-    session.chainFront = chainHead_WSSession;
-    session.chainBack = null;
-    //inform the old head
-    chainHead_WSSession.chainBack = session;
-    //change head (add on top)
-    chainHead_WSSession = session;
-};
-
-const RemoveWSSession = (session) => {
-    //check if head
-    if(session == chainHead_WSSession)
-        //neighbour becomes a new head
-        chainHead_WSSession = session.chainFront;
-    else
-        //tell the neighbour to target its neighbour
-        session.chainBack = session.chainFront 
-};
-
-const CloseAllWSSessions = () => {
-    let socket = chainHead_WSSession;
-    let next = null;
-    while(socket){
-        next = socket.chainFront;
-        socket.close();
-        socket = next;
-    }
-};
-
-//#endregion
-
-//================================================================
-
-
+const downloadSessionCounter = 0;
 const downloadSessionChain = new ChainArray();
-const uploadSessionChain = new ChainArray();
-
-//================================================================
-//#region WebSocket server
-
+    //.length won't include sessions currently working(tunneling or setuping). Use downloadSessionCounter - downloadSessionChain.length to count busy
+const GenerateDownloadKey = () => GenerateKey(downloadSessionKeyLength);
 const CheckDownloadKey = (key) => {
     if(typeof(key) == 'string')
         return downloadSessionKeyLength == key.length;
     return false;
 }
+const FindDownloadSession = (key) => {
+    let socket = downloadSessionChain.head;
+    while(socket)
+        if(socket._key === key)
+            return socket;
+        else
+            socket = socket.chainFront;
+    return null;
+};
 
-const GenerateDownloadKey = () => GenerateKey(downloadSessionKeyLength);
-
-const wsServer = new WebSocket.Server(
-    (wsPort == serverPort) ? 
-        {
-            server: server
-            ,maxPayload: wsMaxPayLoad
-        }
-    : 
-        {
-            port: wsPort
-            ,maxPayload: wsMaxPayLoad
-        }
-);
-//() => {console.log("WebSocket server running on " + (wsPort == serverPort) ? 'the same port as HTTP server' : wsPort);}
-
-let wsSessionCounter = 0;
-
-wsServer.on('connection', (socket, req) => {
-    //check key and counter
-    if(req.headers['key'] !== downloadServiceSecretKey || wsSessionCounter >= wsSessionMaxCount){
-        socket.close();
-        return;
-    }
-    console.log('New connection has been Approved');
-
+const SetupDownloadSocket = (socket) => {
     //save session
-    wsSessionCounter++;
-    socket._key = "";
+    socket._key = null;
     socket._fileLength = -1;
     socket._fileName = 'unnamed.thing';
     //usage ._chunkLength is mixed with setTimout returned id
     socket._chunkLength = 0;
     socket._client = null;
     socket._lastMessageDate = new Date();
-    //define chain properties
+    //Cache chain properties
     socket.chainBack = null;
     socket.chainFront = null;
 
@@ -282,7 +220,8 @@ wsServer.on('connection', (socket, req) => {
                 //end downloading
                 socket._client.end();
                 //destroy ws
-                CloseSession(socket);
+                //socket was removed from the chain earlier
+                socket.close();
                 return;
             }
             //ask for next
@@ -292,67 +231,106 @@ wsServer.on('connection', (socket, req) => {
 
     //on close
     socket.on("close",e => {
-        CloseSession(socket);
+        //check if socket was in chain
+        if(socket._key)
+            downloadSessionChain.Remove(socket);
+        //destroy socket
+        socket.terminate();
     });
 
     //on error
-    socket.on('error', err => {        
-        TerminateSession(socket);
+    socket.on('error', err => {
+        //check if it was in the chain
+        if(socket._key)
+            downloadSessionChain.Remove(socket);
+        //destroy socket
+        socket.terminate();
+
         //potential error codes(err.code):
         //WS_ERR_UNSUPPORTED_MESSAGE_LENGTH
-    });
-    
-    
-    //hire self check
-    //socket._chunkLength = setTimeout(objClose, minWSConfigDelay, socket);
+    });        
+};
+
+//#endregion
+
+//================================================================
+//#region WS - Upload service
+//Transfers File with WS, from WS A to WS B.
+//A is the outside client. (requires Invite key)
+//B is the actual service. (requires Secret Upload service kay).
+
+const uploadSessionCounter = 0;
+const uploadSessionChain = new ChainArray();
+    //.length won't include sessions currently working(tunneling or setuping). Use uploadSessionCounter - uploadSessionChain.length to count busy
+const FindUploadSession = (key) => {
+    let socket = uploadSessionChain.head;
+    while(socket)
+        if(socket._key === key)
+            return socket;
+        else
+            socket = socket.chainFront;
+    return null;
+};
 
 
+const SetupUploadServiceSocket = (socket) => {
+
+};
+
+const SetupUploadClientSocket = (socket) => {
+
+};
+
+//#endregion
+
+//================================================================
+//#region WebSocket server
+
+const wsServer = new WebSocket.Server(
+    (wsPort == serverPort) ? 
+        {
+            server: server
+            ,maxPayload: wsMaxPayLoad
+        }
+    : 
+        {
+            port: wsPort
+            ,maxPayload: wsMaxPayLoad
+        }
+);
+//() => {console.log("WebSocket server running on " + (wsPort == serverPort) ? 'the same port as HTTP server' : wsPort);}
+
+
+wsServer.on('connection', (socket, req) => {    
+    //check key(purpose of the connection)
+    //it is important to not declare variables from this scope (due to cheaper/faster memory handling)
+    if(req.headers['key'] === downloadServiceSecretKey){
+        //client is the future source of file for download service
+        //check counter
+        if(downloadSessionCounter >= downloadSessionMaxCount){
+            //Too much of download session hanging
+            socket.close();
+            return;
+        }
+        //setup download socket
+        SetupDownloadSocket(socket);
+    }else if(req.headers['key'] === uploadServiceSecretKey){
+        //client is the future endpoint of upload service
+        //setup upload socket
+        SetupUploadServiceSocket(socket);
+    }
+    else{
+        //check upload invitation key
+        socket._client = FindUploadSession(req.headers['key']);
+        if(socket._client)
+            //setup upload socket
+            SetupUploadClientSocket(socket);
+        else{
+            //close hacker's connection
+            socket.terminate();
+            return;
+        }
+    }
 });
-
-
-const DelistSession = (socket) => {
-    //safe check if it is listed
-    if(socket.chainBack != null || socket.chainFront != null)
-        downloadSessionChain.Remove(socket);
-};
-const CloseSession = (socket) => {
-    //check if it is listed
-    DelistSession(socket);
-    //destroy session
-    socket.close();
-    //stats
-    wsSessionCounter--;
-};
-const TerminateSession = (socket) => {
-    //check if it is listed
-    DelistSession(socket);
-    //destroy session
-    socket.terminate();
-    //stats
-    wsSessionCounter--;
-};
-
-const objClose = (obj) => {
-    obj.close();
-    obj = null;
-};
-//returns if the socket did stop responding
-//used for:
-//-checking delay in chunk delivery (called by the ???)
-//-checking key expiration date (called by the chain scanner event)
-//-checking delay in delivering config (called by the individual setTimout)
-const checkWSDelay = (socket) => {
-    //calculate the diffrence
-    const d = new Date() - socket._lastMessageDate;
-    //check socket state
-    if(socket._key)
-        //check expiration date
-        return d > minLinkExpirationTime;
-    else if(socket._fileName)
-        //check delay in chunk delivery
-        return d > minWSMessageDelay;
-    //check delay in config delivery
-    return d > minWSConfigDelay;
-};
 
 //#endregion
