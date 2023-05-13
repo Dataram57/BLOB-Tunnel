@@ -1,0 +1,13 @@
+.box1{
+    margin: 0px 32px;
+    text-align: center;
+}
+table, tr, th{
+    border: 1px solid;
+}
+td,th{
+    padding: 5px;
+}
+.d-flex{
+    display: flex;
+}

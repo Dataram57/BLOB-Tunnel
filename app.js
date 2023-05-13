@@ -22,10 +22,10 @@ const uploadServiceSecretKey = 'ZAQ!2wsx';
 const uploadSessionKeyLength = 16;
 const uploadSessionMaxCount = 16;
 //WS server delay checks
-const minLinkExpirationTime = 3 * 60 * 1000;
-const minWSMessageDelay = 30 * 1000;
-const checkWSConfigTime = 10 * 1000;
-const checkExpirationForAllTime = 30 * 1000;
+//obsolete cause they should rely on the admin's side
+//WS client delay/error checks
+const maxClientDelayInMessage = 10 * 1000; 
+//client has strict rules, and should only message once whenever the tunnel message him.
 
 //#endregion
 

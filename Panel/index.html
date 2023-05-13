@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Tunnel Agent - Panel</title>
+        <link rel="stylesheet" href="index.css">
+        <script src="index.js"></script>
+    </head>
+    <body>
+        <h1>Tunnel Agent - Panel</h1>
+        <div class="d-flex">
+            <div class='box1'>
+                <h3>Download Service (<span id="DownloadServiceCounter"></span>)<h3>
+                <table>
+                    <tr>
+                        <th>Key</th>
+                        <th>Target file</th>
+                        <th>Progress</th>
+                        <th>Left progress</th>
+                    </tr>
+                </table>
+            </div>
+            <div class='box1'>
+                <h3>Upload Service (<span id="UploadServiceCounter"></span>)<h3>
+                <table>
+                    <tr>
+                        <th>Key</th>
+                        <th>Target file</th>
+                        <th>Target length</th>
+                        <th>Left length</th>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+
+
+        <script>
+            const DownloadServiceCounter = document.getElementById('DownloadServiceCounter');
+            const UploadServiceCounter = document.getElementById('UploadServiceCounter');
+            Init();
+        </script>
+    </body>
+</html>
