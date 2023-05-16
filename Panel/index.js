@@ -55,7 +55,7 @@ const PanelRefreshList = async () => {
         let elem = null;
         while(++i < json.DownloadService.length){
             elem = json.DownloadService[i];
-            DownloadServiceRows.innerHTML += sr + GetCopyAbleHTMLText(elem.key) + br + elem.targetFile + br + elem.progress + br + elem.leftProgress + er;
+            DownloadServiceRows.innerHTML += sr + GetCopyAbleHTMLText(elem.key) + br + elem.targetFile + br + elem.fileName + br + elem.offset + br + elem.length + er;
         }
         //rows - Upload
         i = -1;

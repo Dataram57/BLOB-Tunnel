@@ -51,7 +51,6 @@ Tunnel Messages:
         --event2: when the file info will not be accepted by the initiator(Tunnel Agent).
         --event3: when the client will break the rule of not waiting for a permission to send.
 //----------------------------------------------------------------
-
 Tunnel API:
 
 /
@@ -61,8 +60,6 @@ Tunnel API:
 /download/KEY
 --Form: ANY
 --Info: A download tunnel which allows the user to download the content once.
-
-
 
 ================================================================
 Messaging Protocol for the tunnel agent.
@@ -82,9 +79,10 @@ Agent API:
             //session
             {
                 key: STRING
-                ,targetFile: STRING 
-                ,progress: INT //current chunk position of the file
-                ,leftProgress: INT //length of the target file - 1
+                ,targetFile: STRING
+                ,fileName: STRING
+                ,offset: INT //current offset/position of the file reader
+                ,length: INT //total length of the target file.
             }
         ]
         ,UploadService:[
@@ -118,7 +116,6 @@ Agent API:
     {
         error: STRING //Failure cause
     }
-
 
 ================================================================
 Potential example plan for download service for client.
