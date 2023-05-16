@@ -98,6 +98,28 @@ Agent API:
         ]
     }
 
+/killDownload/$key
+/killUpload/$key
+--Form: TRUE/FALSE
+--Info: Kills a specific listed connection on a specific service.
+
+/startDownload/$targetFile/$fileName
+--Form: JSON
+--Info: Opens a download connection and handles the specific $targetFile transfer.
+--Input: $targetFile and $fileName are encoded using JS encodeURIComponent function.
+--Example:
+    {
+        key: STRING
+        ,targetFile: STRING 
+        ,progress: INT //current chunk position of the file
+        ,leftProgress: INT //length of the target file - 1
+    }
+--Example2:
+    {
+        error: STRING //Failure cause
+    }
+
+
 ================================================================
 Potential example plan for download service for client.
 
@@ -127,4 +149,4 @@ Potential example plan of upload service for client.
     *4. Return the access denied
 3. Get the Upload key
 *3. Access Denied
-4. Start uploading
+4. Start uploading (through WS)

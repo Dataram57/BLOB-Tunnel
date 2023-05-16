@@ -13,7 +13,7 @@ const tunnelURL = 'localhost';
 const useSSL = false;
 const openedTransferMaxCount = 30;
 //IO
-const baseDir = '';
+const baseDir = 'base/';
 const chunkLength = 1024;
 //Additional Callbacker
 const callbackerModulePath = './app_agent_callbacker.js';
@@ -39,8 +39,25 @@ const Callbacker = (callbackerModulePath) ? require(callbackerModulePath) : {
 const ChainArray = require('./ChainArray.js');
 const express = require('express');
 const WebSocket = require('ws');
+const fs = require('fs');
 const RandomAccessFile = require('random-access-file')
 const app = express();
+//#endregion
+
+//================================================================
+//#region Utilities
+
+const FileExists = (path) => {
+    return new Promise(resolve => {
+        fs.stat(path, (err, stats) => {
+            if (err || !stats.isFile()) 
+                resolve(false);
+            else 
+                resolve(true);
+        });
+    });
+};
+
 //#endregion
 
 //================================================================
@@ -99,7 +116,44 @@ app.get(apiPrefix + 'list', function (req, res) {
     res.end('}');
 });
 
+//startDownload
+
 //#endregion
+app.get(apiPrefix + 'startDownload/*', async function (req, res) {
+    console.log(req.url);
+    //check URL minimum
+    const args = req.url.split('/');
+    if(args.length < 3){
+        //error
+        res.send({error:'URL does not contain all the necessary arguments.'});
+        res.end();
+        return;
+    }
+    //read params
+    const fileName = decodeURIComponent(args.length - 1);
+    let filePath = decodeURIComponent(args.length - 2);
+    //check params
+    if(fileName.trim().length == 0){
+        //error
+        res.send({error:'$fileName is empty.'});
+        res.end();
+        return;
+    }
+    //check file existance
+    //1.check if path is direct
+    if(!await FileExists(filePath)){
+        //2.check if path is relative
+        filePath = baseDir + filePath;
+        if(!await FileExists(filePath)){
+            //error
+            res.send({error:'$fileName is empty.'});
+            res.end();
+            return;
+        }
+    }
+    //create a tunnel
+    let key = await CreateDownloadSession(filePath, fileName);
+});
 
 //----------------------------------------------------------------
 //#region Panel
@@ -123,10 +177,18 @@ app.listen(serverPort);
 
 //#endregion
 
+//#endregion
+
 //================================================================
 //#region Download Tunnel Service
 
 const downloadSessionChain = new ChainArray();
+
+const CreateDownloadSession = async (targetFile, fileName) => {
+    
+    
+
+};
 
 //#endregion
 
