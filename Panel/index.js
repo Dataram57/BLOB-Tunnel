@@ -48,8 +48,8 @@ const PanelRefreshList = async () => {
         DownloadServiceCounter.innerHTML = json.DownloadService.length;
         UploadServiceCounter.innerHTML = json.UploadService.length;
         //clear rows
-        DownloadServiceRows.innerHTML = '';
-        UploadServiceRows.innerHTML = '';
+        DownloadServiceRows.innerHTML = DownloadServiceRowsStart;
+        UploadServiceRows.innerHTML = UploadServiceRowsStart;
         //rows - Donwload
         let i = -1;
         let elem = null;
@@ -116,6 +116,15 @@ const PanelHostDownload = () => {
 };
 
 //Init Panel
+//Requirements:
+//-DownloadServiceRows
+//-var DownloadServiceRowsStart
+//-UploadServiceRows
+//-var UploadServiceRowsStart
 const InitPanel = () => {
+    //catch old innerHMTL
+    DownloadServiceRowsStart = DownloadServiceRows.innerHTML;
+    UploadServiceRowsStart = UploadServiceRows.innerHTML;
+    //refresh
     PanelRefreshList();
 };

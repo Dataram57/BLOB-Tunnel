@@ -17,8 +17,10 @@
         </div>
         <div class="d-flex">
             <div class='box1'>
-                <h3>Download Service (<span id="DownloadServiceCounter"></span>)<h3>
-                <table>
+                <h3>
+                    Download Service (<span id="DownloadServiceCounter"></span>)
+                </h3>
+                <table id="DownloadServiceRows">
                     <tr>
                         <th>Key</th>
                         <th>Target file</th>
@@ -26,21 +28,17 @@
                         <th>Offset</th>
                         <th>Length</th>
                     </tr>
-                    <div id="DownloadServiceRows">
-                    </div>
                 </table>
             </div>
             <div class='box1'>
                 <h3>Upload Service (<span id="UploadServiceCounter"></span>)<h3>
-                <table>
+                <table id="UploadServiceRows">
                     <tr>
                         <th>Key</th>
                         <th>Target file</th>
                         <th>Target length</th>
                         <th>Left length</th>
                     </tr>
-                    <div id="UploadServiceRows">
-                    </div>
                 </table>
             </div>
         </div>
@@ -66,8 +64,10 @@
         <script>
             //
             const DownloadServiceCounter = document.getElementById('DownloadServiceCounter');
+            let DownloadServiceRowsStart = '';
             const DownloadServiceRows = document.getElementById('DownloadServiceRows');
             const UploadServiceCounter = document.getElementById('UploadServiceCounter');
+            let UploadServiceRowsStart = '';
             const UploadServiceRows = document.getElementById('UploadServiceRows');
             //
             const InputFilePath = document.getElementById('InputFilePath');

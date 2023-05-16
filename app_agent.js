@@ -2,7 +2,9 @@
 This application is an agent / a tool to communicate with the public tunnel, in order to establish some connection between private servers and the outside client.
 //================================================================*/
 //#region Config
-
+//IO
+const baseDir = 'base/';
+const chunkLength = 1024;
 //API and Panel
 const serverPort = 6060;
 const apiPrefix = '/api/';
@@ -12,9 +14,10 @@ const panelDirPath = __dirname + '/Panel/';
 const tunnelURL = 'localhost';
 const useSSL = false;
 const openedTransferMaxCount = 30;
-//IO
-const baseDir = 'base/';
-const chunkLength = 1024;
+//Download Service
+const downloadServiceSecretKey = 'zaq1"WSX';
+//Upload Service
+const uploadServiceSecretKey = 'ZAQ!2wsx';
 //Additional Callbacker
 const callbackerModulePath = './app_agent_callbacker.js';
 //Used functions:
@@ -40,7 +43,7 @@ const ChainArray = require('./ChainArray.js');
 const express = require('express');
 const WebSocket = require('ws');
 const fs = require('fs');
-const RandomAccessFile = require('random-access-file')
+const RandomAccessFile = require('random-access-file');
 const app = express();
 //#endregion
 
@@ -56,6 +59,19 @@ const FileExists = (path) => {
                 resolve(true);
         });
     });
+};
+
+const GetWebSocketURL = () => {
+    if(useSSL)
+        return 'wss:' + tunnelURL;
+    return 'ws:' + tunnelURL; 
+};
+
+const GetRAFTargetFile = (raf) => {
+    console.log(raf);
+    if(raf.directory)
+        return raf.directory + raf.filename;
+    return raf.filename;
 };
 
 //#endregion
@@ -85,12 +101,15 @@ app.get(apiPrefix + 'list', function (req, res) {
     let session = downloadSessionChain.head;
     let i = downloadSessionChain.length;
     while(session){
-        res.write({
-            key: session._key
-            ,targetFile: session._targetFile
-            ,progress: session._progress
-            ,leftProgress: session._leftProgress
-        });
+        res.write(JSON.stringify({
+            key: session._key.toString()
+            ,targetFile: GetRAFTargetFile(session._fr)
+            ,fileName: session._fileName
+            ,offset: session._offset
+            ,length: session._length
+            ,state: session._state
+        }));
+        session = session.chainFront;
         if(--i > 0)
             res.write(',');
     }
@@ -108,6 +127,7 @@ app.get(apiPrefix + 'list', function (req, res) {
             ,targetLength: session._targetLength
             ,leftLength: session._leftLength
         });
+        session = session.chainFront;
         if(--i > 0)
             res.send(',');
     }
@@ -117,8 +137,6 @@ app.get(apiPrefix + 'list', function (req, res) {
 });
 
 //startDownload
-
-//#endregion
 app.get(apiPrefix + 'startDownload/*', async function (req, res) {
     console.log(req.url);
     //check URL minimum
@@ -130,10 +148,11 @@ app.get(apiPrefix + 'startDownload/*', async function (req, res) {
         return;
     }
     //read params
-    const fileName = decodeURIComponent(args.length - 1);
-    let filePath = decodeURIComponent(args.length - 2);
+    const fileName = decodeURIComponent(args[args.length - 1]);
+    let filePath = decodeURIComponent(args[args.length - 2]);
     //check params
-    if(fileName.trim().length == 0){
+    console.log(fileName);
+    if(fileName.trim().length == 0){ 
         //error
         res.send({error:'$fileName is empty.'});
         res.end();
@@ -146,14 +165,18 @@ app.get(apiPrefix + 'startDownload/*', async function (req, res) {
         filePath = baseDir + filePath;
         if(!await FileExists(filePath)){
             //error
-            res.send({error:'$fileName is empty.'});
+            res.send({error:'File at $filePath does not exist.'});
             res.end();
             return;
         }
     }
     //create a tunnel
-    let key = await CreateDownloadSession(filePath, fileName);
+    const response = await CreateDownloadSession(filePath, fileName);
+    res.send(response);
+    res.end();
 });
+
+//#endregion
 
 //----------------------------------------------------------------
 //#region Panel
@@ -182,12 +205,97 @@ app.listen(serverPort);
 //================================================================
 //#region Download Tunnel Service
 
+//Chain of all successfully initiated and allowed to be handled, sessions.
 const downloadSessionChain = new ChainArray();
 
-const CreateDownloadSession = async (targetFile, fileName) => {
-    
-    
+//Creates a download session
+//returns the JSON containing either a key or an error.
+const CreateDownloadSession = (targetFile, fileName) => {
+    return new Promise(resolve => {
+        //create a file reader
+        //IMPORTANT: RandomAccessFile will only throw an error at reading
+        //That's why it is important to make checks of the target file earlier
+        //Or force it to do a check or throw an error
+        const fr = new RandomAccessFile(targetFile);
+        fr.stat((err, stat) => {
+            if(err){
+                resolve({error: "Couldn't read the file stats."});
+                return;
+            }
+            //check the file stat
+            if(typeof(stat.size) != 'number'){
+                resolve({error: "The size of the file was not read in an understandable format."});
+                return;
+            }
+            //check weird size
+            else if(stat.size < 0){
+                resolve({error: "The size of the file is below 0."});
+                return;
+            }
+            //create a connection
+            const socket = new WebSocket(GetWebSocketURL(), {
+                perMessageDeflate: false,
+                headers: {
+                    key: downloadServiceSecretKey
+                }
+            });
+            //assign events and properties
+            //metadata
+            socket._fileName = fileName;
+            //file reading
+            socket._fr = fr;                //File reader object
+            socket._length = stat.size;     //Length of the file
+            socket._offset = 0;             //current file offset (must be < _length)
+            //state
+            socket._key = '';               //invitation key
+            socket._resolver = resolve;     //called once and only when key is recieved
+            //add to chain
+            downloadSessionChain.Add(socket);
+            //events
+            SetupDownloadSessionEvents(socket);
+        });
+    });
+};
 
+const SetupDownloadSessionEvents = (socket) => {
+    //on open
+    socket.on("open", e => {
+        //Send the setup
+        const setup = {
+            fileName: socket._fileName
+            ,fileSize: socket._length
+            , chunkLength: chunkLength
+        };
+        socket.send(JSON.stringify(setup));
+    });
+
+    //on message
+    socket.on("message", msg => {
+        console.log(msg);
+        //key
+        if(msg.subarray(0,4).toString() == 'key;'){
+            //key is not set yet
+            socket._key = msg.subarray(4);
+            //call the callback
+            socket._resolver({key: socket._key.toString()});
+            //destroy the callback
+            socket._resolver = undefined;
+        }
+        //next
+        else if(msg.subarray(0,5).toString() == 'next;'){
+            //sendNextChunk();
+        }
+    });
+
+    //on close
+    socket.on("close", e => {
+        console.log(e);
+    });
+
+    //on error
+    socket.on("error", err => {
+        console.log(err);
+    });
 };
 
 //#endregion
@@ -195,6 +303,7 @@ const CreateDownloadSession = async (targetFile, fileName) => {
 //================================================================
 //#region Upload Tunnel Service
 
+//Chain of all successfully initiated and allowed to be handled, sessions.
 const uploadSessionChain = new ChainArray();
 
 //#endregion
