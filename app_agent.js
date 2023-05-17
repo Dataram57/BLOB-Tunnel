@@ -4,7 +4,7 @@ This application is an agent / a tool to communicate with the public tunnel, in 
 //#region Config
 //IO
 const baseDir = 'base/';
-const chunkLength = 1024;
+const readChunkLength = 1024;
 //API and Panel
 const serverPort = 6060;
 const apiPrefix = '/api/';
@@ -74,6 +74,12 @@ const GetRAFTargetFile = (raf) => {
     return raf.filename;
 };
 
+const KeyToString = (key) => {
+    if(key === null)
+        return "Closing...";
+    return key.toString();
+};
+
 //#endregion
 
 //================================================================
@@ -102,7 +108,7 @@ app.get(apiPrefix + 'list', function (req, res) {
     let i = downloadSessionChain.length;
     while(session){
         res.write(JSON.stringify({
-            key: session._key.toString()
+            key: KeyToString(session._key)
             ,targetFile: GetRAFTargetFile(session._fr)
             ,fileName: session._fileName
             ,offset: session._offset
@@ -138,7 +144,6 @@ app.get(apiPrefix + 'list', function (req, res) {
 
 //startDownload
 app.get(apiPrefix + 'startDownload/*', async function (req, res) {
-    console.log(req.url);
     //check URL minimum
     const args = req.url.split('/');
     if(args.length < 3){
@@ -151,7 +156,6 @@ app.get(apiPrefix + 'startDownload/*', async function (req, res) {
     const fileName = decodeURIComponent(args[args.length - 1]);
     let filePath = decodeURIComponent(args[args.length - 2]);
     //check params
-    console.log(fileName);
     if(fileName.trim().length == 0){ 
         //error
         res.send({error:'$fileName is empty.'});
@@ -264,37 +268,87 @@ const SetupDownloadSessionEvents = (socket) => {
         const setup = {
             fileName: socket._fileName
             ,fileSize: socket._length
-            , chunkLength: chunkLength
+            , chunkLength: readChunkLength
         };
         socket.send(JSON.stringify(setup));
     });
 
     //on message
     socket.on("message", msg => {
-        console.log(msg);
         //key
         if(msg.subarray(0,4).toString() == 'key;'){
-            //key is not set yet
+            //key is not set yet or has changed
             socket._key = msg.subarray(4);
             //call the callback
-            socket._resolver({key: socket._key.toString()});
-            //destroy the callback
-            socket._resolver = undefined;
+            if(socket._resolver){
+                socket._resolver({key: socket._key.toString()});
+                socket._resolver = undefined;
+            }
         }
         //next
         else if(msg.subarray(0,5).toString() == 'next;'){
-            //sendNextChunk();
+            //wants to send the next chunk of the data.
+            socket._fr.read(socket._offset, Math.min(readChunkLength, socket._length - socket._offset), (err, raw) => {
+                if(err){
+                    console.log(err)
+                }
+                //send chunk
+                socket.send(raw);
+                //next
+                socket._offset += readChunkLength;
+                //check if EOF
+                if(socket._offset >= socket._length)
+                    //Finish Session.
+                    CloseDownloadSession(socket);
+            });
         }
     });
 
     //on close
     socket.on("close", e => {
         console.log(e);
+        //recognize the state
+        //...
+        if(socket._offset < socket._length){
+            //Tunnel has closed the connection while the reading has not been finished
+            CloseDownloadSession(socket)
+        }
+        else
+            //everything has went fine
+            CloseDownloadSession(socket);
     });
 
     //on error
     socket.on("error", err => {
         console.log(err);
+        //recognize the state
+        //...
+        if(socket._offset < socket._length){
+            //Tunnel has closed the connection while the reading has not been finished
+            CloseDownloadSession(socket)
+        }
+        else
+            //everything has went fine
+            //so there is no need to worry about the client/error
+            CloseDownloadSession(socket);
+    });
+};
+
+const CloseDownloadSession = (socket) => {
+    //don't call it again
+    if(socket._key === null)
+        return;
+    //mark as it is being closed
+    console.log('Closing download session:',KeyToString(socket._key));
+    socket._key = null;
+    //close file stream
+    socket._fr.close((err) => {
+        if(err)
+            console.log(err);
+        //delist from the chain
+        downloadSessionChain.Remove(socket);
+        //close WebSocket
+        socket.close();
     });
 };
 

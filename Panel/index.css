@@ -18,6 +18,8 @@ table, th, td{
 }
 td,th{
     padding: 5px;
+    max-width: 196px;
+    word-wrap: break-word;
 }
 .d-flex{
     display: flex;

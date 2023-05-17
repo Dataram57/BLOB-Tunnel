@@ -9,11 +9,11 @@ Tunnel Messages:
             --event: on start
             --event: ANYTIME before the downloading starts
             DATA of next chunk of the file
-            --event: nextchunk;
+            --event: next;
         Output:
             key;FILE_DOWNLOAD_KEY
             --event: first file config applied
-            nextchunk;
+            next;
             --event: when the previous chunk of the file will be delivered.
             --expects: DATA format of the next file chunk.
         Close:
@@ -24,13 +24,13 @@ Tunnel Messages:
         Input: 
             JSON config
             --event: on start
-            nextchunk;
+            next;
             --event: When the agent will write the chunk correctly.
         Output:
             key;FILE_UPLOAD_KEY
             --event: when the config will be accepted
             DATA of next requested chunk.
-            --event: When the Client will send its chunk(earlier requested by Input: nextchunk;) and won't break the guidelines.
+            --event: When the Client will send its chunk(earlier requested by Input: next;) and won't break the guidelines.
         Close:
         --event: when key expires
         --event2: when idle (optional)
@@ -41,9 +41,9 @@ Tunnel Messages:
             JSON file info
             --event: on start
             DATA
-            event: nextchunk;
+            event: next;
         Output:
-            nextchunk;
+            next;
             --event: when the previous chunk of the file will be delivered.
             --event2: when the file info will be accepted by the initiator(Tunnel Agent).
         Close;
