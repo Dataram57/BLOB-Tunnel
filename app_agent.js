@@ -225,14 +225,14 @@ app.get(panelPrefix + '*', function (req, res) {
     //every file must have an extension
     //otherwise it will be treated as index.html
     const i = target.lastIndexOf('/') - target.lastIndexOf('.');
-    if(i >= 0)
+    if(i >= 0){
         //target is not refering to the file
         //so it must be a page
         //check if '/' at end
         if(i == 0)
-            target += '/index.html';
-        else
-            target += 'index.html';
+            target += '/';
+        target += 'index.html';
+    }
     //send target (page or file)
     res.sendFile(panelDirPath + target);
 });

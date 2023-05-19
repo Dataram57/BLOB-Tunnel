@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>File Chunk Reader</title>
+    </head>
+    <body>
+        <input type="file" id="fileInput">
+        <script>
+            function readChunks(file) {
+                const chunkSize = 32; // Number of bytes per chunk
+                let offset = 0; // Current offset in the file
+
+                const reader = new FileReader();
+                const decoder = new TextDecoder();
+                
+                reader.onload = function(event) {
+                    const data = new Uint8Array(event.target.result);
+
+                    // Process the chunk
+                    console.log(`Chunk ${offset}-${offset + data.length - 1}:`,decoder.decode(data));
+
+                    // Update the offset
+                    offset += data.length;
+
+                    // Read the next chunk if there's more data
+                    if (offset < file.size) {
+                        readNextChunk();
+                    }
+                };
+
+                function readNextChunk() {
+                    const blob = file.slice(offset, offset + chunkSize);
+                    reader.readAsArrayBuffer(blob);
+                }
+
+                readNextChunk();
+            }
+
+            document.getElementById('fileInput').addEventListener('change', function(event) {
+                const file = event.target.files[0];
+                if (file) {
+                    readChunks(file);
+                }
+            });
+        </script>
+    </body>
+</html>
