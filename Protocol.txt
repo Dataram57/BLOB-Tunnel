@@ -108,9 +108,25 @@ Agent API:
 --Example:
     {
         key: STRING
-        ,targetFile: STRING 
-        ,progress: INT //current chunk position of the file
-        ,leftProgress: INT //length of the target file - 1
+    }
+--Example2:
+    {
+        error: STRING //Failure cause
+    }
+
+/startUpload/$config
+--Form: JSON
+--Info: Opens a download connection and handles the specific $targetFile transfer.
+--Input: $config are encoded using JS encodeURIComponent function.
+----$config contains JSON config
+------Config:
+        {
+            targetFile: STRING //path to the file name
+            ,fileName: STRING //filename of the transfered file
+        }
+--Example:
+    {
+        key: STRING
     }
 --Example2:
     {

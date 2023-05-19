@@ -8,6 +8,7 @@ const readChunkLength = 1024;
 //API and Panel
 const serverPort = 6060;
 const apiPrefix = '/api/';
+const apiPrefixSubCount = apiPrefix.split('/').length;
 const panelPrefix = '/panel/';
 const panelDirPath = __dirname + '/Panel/';
 //Tunnel
@@ -68,7 +69,6 @@ const GetWebSocketURL = () => {
 };
 
 const GetRAFTargetFile = (raf) => {
-    console.log(raf);
     if(raf.directory)
         return raf.directory + raf.filename;
     return raf.filename;
@@ -78,6 +78,15 @@ const KeyToString = (key) => {
     if(key === null)
         return "Closing...";
     return key.toString();
+};
+
+const ScanChainForSessionKey = (head, key) => {
+    while(head)
+        if(head._key == key)
+            return head;
+        else
+            head = head.chainFront;
+    return null;
 };
 
 //#endregion
@@ -142,19 +151,19 @@ app.get(apiPrefix + 'list', function (req, res) {
     res.end('}');
 });
 
-//startDownload
+//startDownload/$targetFile/$fileName
 app.get(apiPrefix + 'startDownload/*', async function (req, res) {
     //check URL minimum
     const args = req.url.split('/');
-    if(args.length < 3){
+    if(args.length < 2 + apiPrefixSubCount){
         //error
         res.send({error:'URL does not contain all the necessary arguments.'});
         res.end();
         return;
     }
     //read params
-    const fileName = decodeURIComponent(args[args.length - 1]);
-    let filePath = decodeURIComponent(args[args.length - 2]);
+    let filePath = decodeURIComponent(args[apiPrefixSubCount]);
+    const fileName = decodeURIComponent(args[apiPrefixSubCount + 1]);
     //check params
     if(fileName.trim().length == 0){ 
         //error
@@ -180,6 +189,28 @@ app.get(apiPrefix + 'startDownload/*', async function (req, res) {
     res.end();
 });
 
+//killDownload/$key
+app.get(apiPrefix + 'killDownload/*', function (req, res) {
+    //check URL minimum
+    const args = req.url.split('/');
+    if(args.length <= apiPrefixSubCount){
+        //error
+        res.send(false);
+        return;
+    }
+    //read Key
+    //search for session
+    const socket = ScanChainForSessionKey(downloadSessionChain.head, args[apiPrefixSubCount]);
+    //check
+    if(socket === null)
+        res.send(false);
+    else{
+        CloseDownloadSession(socket);
+        res.send(true);
+    }
+});
+
+
 //#endregion
 
 //----------------------------------------------------------------
@@ -188,10 +219,21 @@ app.get('/', function (req, res) {
     res.redirect('/panel/');
 });
 
+//Simple Panel explorer
 app.get(panelPrefix + '*', function (req, res) {
     let target = req.originalUrl.substring(panelPrefix.length).trim();
-    if(target.length == 0)
-        target = 'index.html';
+    //every file must have an extension
+    //otherwise it will be treated as index.html
+    const i = target.lastIndexOf('/') - target.lastIndexOf('.');
+    if(i >= 0)
+        //target is not refering to the file
+        //so it must be a page
+        //check if '/' at end
+        if(i == 0)
+            target += '/index.html';
+        else
+            target += 'index.html';
+    //send target (page or file)
     res.sendFile(panelDirPath + target);
 });
 
@@ -261,6 +303,7 @@ const CreateDownloadSession = (targetFile, fileName) => {
     });
 };
 
+//Assigns download behaviour to the given WebSocket connection
 const SetupDownloadSessionEvents = (socket) => {
     //on open
     socket.on("open", e => {
@@ -278,10 +321,10 @@ const SetupDownloadSessionEvents = (socket) => {
         //key
         if(msg.subarray(0,4).toString() == 'key;'){
             //key is not set yet or has changed
-            socket._key = msg.subarray(4);
+            socket._key = msg.subarray(4).toString();
             //call the callback
             if(socket._resolver){
-                socket._resolver({key: socket._key.toString()});
+                socket._resolver({key: socket._key});
                 socket._resolver = undefined;
             }
         }
