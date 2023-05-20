@@ -12,12 +12,13 @@
 
                 const reader = new FileReader();
                 const decoder = new TextDecoder();
-                
+
                 reader.onload = function(event) {
                     const data = new Uint8Array(event.target.result);
 
                     // Process the chunk
-                    console.log(`Chunk ${offset}-${offset + data.length - 1}:`,decoder.decode(data));
+                    //console.log(`Chunk ${offset}-${offset + data.length - 1}:`,decoder.decode(data));
+                    console.log(decoder.decode(data));
 
                     // Update the offset
                     offset += data.length;
@@ -38,6 +39,7 @@
 
             document.getElementById('fileInput').addEventListener('change', function(event) {
                 const file = event.target.files[0];
+                console.log(file);
                 if (file) {
                     readChunks(file);
                 }

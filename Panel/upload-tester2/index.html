@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>File Chunk Reader</title>
+    </head>
+    <body>
+        <input type="file" id="fileInput">
+        <script src="BLOBUtilities.js"></script>
+        <script>
+            /*
+            async function readChunks(file) {
+                const chunkSize = 32; // Number of bytes per chunk
+                let offset = 0; // Current offset in the file
+
+                while (offset < file.size) {
+                    const blob = file.slice(offset, offset + chunkSize);
+                    const chunk = await readChunk(blob);
+
+                    // Process the chunk
+                    console.log(`Chunk ${offset}-${offset + chunk.byteLength - 1}:`, new Uint8Array(chunk));
+
+                    // Update the offset
+                    offset += chunk.byteLength;
+                }
+            }
+
+            function readChunk(blob) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = () => reject(reader.error);
+                    reader.readAsArrayBuffer(blob);
+                });
+            }
+            */
+            let blobTunnel = null;
+            document.getElementById('fileInput').addEventListener('change', function(event) {
+                const file = event.target.files[0];
+                console.log(file);
+                if (file) {
+                    blobTunnel = new BLOBUtilities.BLOBUploader({
+                        url: ''
+                        ,chunkLength: 32
+                        ,fileSize: file.size
+                        ,file: file
+                    });
+                    blobTunnel.ReadNextChunk((result) => {
+                        console.log(result);
+                    });
+                }
+            });
+        </script>
+    </body>
+</html>
