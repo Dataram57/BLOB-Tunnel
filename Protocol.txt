@@ -117,12 +117,16 @@ Agent API:
 /startUpload/$config
 --Form: JSON
 --Info: Opens a download connection and handles the specific $targetFile transfer.
+        It is also important to note that a file can be written only by one session and NOT MULTIPLE.
 --Input: $config are encoded using JS encodeURIComponent function.
 ----$config contains JSON config
 ------Config:
         {
-            targetFile: STRING //path to the file name
-            ,fileName: STRING //filename of the transfered file
+            outputPath: STRING //relative output file path of the transfered file
+            ,maxFileSize: INT //maximum size of the all summed chunks' lengths (used by the tunnel, to block the client from sending more than actually needs)
+            ,chunkLengh: INT //length of a single chunk transfered by the client, through the tunnel
+            //OPTIONAL ONLY:
+            ,overwrite: BOOLEAN //overwrite existing file, if necessary.
         }
 --Example:
     {

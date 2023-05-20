@@ -70,14 +70,14 @@ const PanelRefreshList = async () => {
 //Requirements:
 //-InputFilePath
 //-InputFileName
-//-ButtonHost
+//-ButtonHostDownload
 //-CreateDownloadSessionCheckBox
 //-CreateDownloadSessionResponse
 const PanelHostDownload = () => {
-    Log('Called a request to host a download key...');
+    Log('Called a request to host a download session...');
     //disable
     InputFilePath.disabled = true;
-    ButtonHost.disabled = true;
+    ButtonHostDownload.disabled = true;
     //call API
     FetchGet('startDownload/' + encodeURIComponent(InputFilePath.value) + '/' + encodeURIComponent(InputFileName.value), (res) => {
         //switch
@@ -108,12 +108,48 @@ const PanelHostDownload = () => {
         CreateDownloadSessionResponse.innerHTML = msg;
         //enable
         InputFilePath.disabled = false;
-        ButtonHost.disabled = false;
+        ButtonHostDownload.disabled = false;
         //checkbox
         if(CreateDownloadSessionCheckBox.checked)
             PanelRefreshList();
     });
 };
+
+//Download session generator
+//Requirements:
+//-InputOutputFilePath
+//-InputChunkLength
+//-InputMaxiumumFileSize
+//-ButtonHostUpload
+//-CreateUploadSessionResponse
+//-CreateUploadSessionCheckBoxOverwrite
+//-CreateUploadSessionCheckBoxRefresh
+const PanelHostUpload = () => {
+    Log('Called a request to host a upload session...');
+    //disable
+    InputOutputFilePath.disabled = true;
+    InputChunkLength.disabled = true;
+    InputMaxiumumFileSize.disabled = true;
+    ButtonHostUpload.disabled = true;
+    CreateUploadSessionCheckBoxOverwrite.disabled = true;
+    //Construct config
+    const config = {
+        outputPath: InputOutputFilePath.value
+        ,chunkLengh: parseInt(InputChunkLength.value)
+        ,maxFileSize: parseInt(InputMaxiumumFileSize.value)
+    };
+    //call API
+    FetchGet('startUpload/' + encodeURIComponent(JSON.stringify(config)), (res) => {
+        
+        //enable
+        InputOutputFilePath.disabled = false;
+        InputChunkLength.disabled = false;
+        InputMaxiumumFileSize.disabled = false;
+        ButtonHostUpload.disabled = false;
+        CreateUploadSessionCheckBoxOverwrite.disabled = false;
+    });
+};
+
 
 //Init Panel
 //Requirements:

@@ -3,7 +3,7 @@ This application is an agent / a tool to communicate with the public tunnel, in 
 //================================================================*/
 //#region Config
 //IO
-const baseDir = 'base/';
+const baseDir = 'base/';        //Directory with 777 access
 const readChunkLength = 1024;
 //API and Panel
 const serverPort = 6060;
@@ -45,6 +45,7 @@ const express = require('express');
 const WebSocket = require('ws');
 const fs = require('fs');
 const RandomAccessFile = require('random-access-file');
+const { json } = require('express');
 const app = express();
 //#endregion
 
@@ -87,6 +88,22 @@ const ScanChainForSessionKey = (head, key) => {
         else
             head = head.chainFront;
     return null;
+};
+
+const ReadLastParameterFromURL = (url) => {
+    return decodeURIComponent(url.substring(url.lastIndexOf('/') + 1));
+};
+
+const ReadJSONConfigFromURL = (url) => {
+    //trim
+    url = ReadLastParameterFromURL(url);
+    //try to parse
+    try{
+        return JSON.parse(url);
+    }
+    catch(e){
+        return null;
+    }
 };
 
 //#endregion
@@ -210,6 +227,32 @@ app.get(apiPrefix + 'killDownload/*', function (req, res) {
     }
 });
 
+//startUpload/$config
+app.get(apiPrefix + 'startUpload/*', async function (req, res) {
+    //read config
+    const config = ReadJSONConfigFromURL(req.url);
+    //check config parameters
+    if(typeof(config.outputPath) != 'string' || typeof(config.chunkLengh) != 'number' || typeof(config.maxFileSize) != 'number'){
+        res.send({error: 'Config is not in a right format.'});
+        return;
+    }
+    //check numbers
+    if(config.chunkLengh <= 0){
+        res.send({error: "$chunkLength can not be below or equal to 0."});
+        return;
+    }
+    if(config.maxFileSize <= 0){
+        res.send({error: "$maxFileSize can not be below or equal to 0."});
+        return;
+    }
+    //check file existence
+    config.filePath = baseDir + config.filePath;
+    if(await FileExists(config.filePath)){
+        //check overwrite
+    }
+    //end
+    res.send({});
+});
 
 //#endregion
 

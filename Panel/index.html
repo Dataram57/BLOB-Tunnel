@@ -67,14 +67,39 @@
                 <input id='CreateDownloadSessionCheckBox' type="checkbox" checked>
                 List auto refersh
             </p>
-            <button onclick="PanelHostDownload()" id="ButtonHost">Host</button>
+            <button onclick="PanelHostDownload()" id="ButtonHostDownload">Host</button>
             <h4>Response:</h4>
             <p id="CreateDownloadSessionResponse">...</p>
         </div>
         <div class="break"></div>
         <div class="header1">
             <h2>Create Upload Session</h2>
+            <p>
+                Output file path:
+                <input type="text" id="InputOutputFilePath">
+            </p>
+            <p>
+                Chunk length:
+                <input type="number" id="InputChunkLength" value="1024">
+            </p>
+            <p>
+                Maxiumum file size:
+                <input type="number" id="InputMaxiumumFileSize">
+            </p>
+            <p>
+                <input id='CreateUploadSessionCheckBoxOverwrite' type="checkbox" checked>
+                Overwrite
+            </p>
+            <p>
+                <input id='CreateUploadSessionCheckBoxRefresh' type="checkbox" checked>
+                List auto refersh
+            </p>
+            <button onclick="PanelHostUpload()" id="ButtonHostUpload">Host</button>
+            <h4>Response:</h4>
+            <p id="CreateUploadSessionResponse">...</p>
         </div>
+        <div class="break"></div>
+        <h1>End</h1>
         <script>
             //
             const DownloadServiceCounter = document.getElementById('DownloadServiceCounter');
@@ -86,9 +111,18 @@
             //
             const InputFilePath = document.getElementById('InputFilePath');
             const InputFileName = document.getElementById('InputFileName');
-            const ButtonHost = document.getElementById('ButtonHost');
+            const ButtonHostDownload = document.getElementById('ButtonHostDownload');
             const CreateDownloadSessionResponse = document.getElementById('CreateDownloadSessionResponse');
             const CreateDownloadSessionCheckBox = document.getElementById('CreateDownloadSessionCheckBox');
+            //
+            const InputOutputFilePath = document.getElementById('InputOutputFilePath');
+            const InputChunkLength = document.getElementById('InputChunkLength');
+            const InputMaxiumumFileSize = document.getElementById('InputMaxiumumFileSize');
+            const ButtonHostUpload = document.getElementById('ButtonHostUpload');
+            const CreateUploadSessionResponse = document.getElementById('CreateUploadSessionResponse');
+            const CreateUploadSessionCheckBoxOverwrite = document.getElementById('CreateUploadSessionCheckBoxOverwrite');
+            const CreateUploadSessionCheckBoxRefresh = document.getElementById('CreateUploadSessionCheckBoxRefresh');
+            //
             InitPanel();
         </script>
     </body>
