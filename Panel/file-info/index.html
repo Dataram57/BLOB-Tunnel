@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Document</title>
+    </head>
+    <body>
+        <input type="file" id="fileInput">
+        <br>
+        <textarea cols='40' rows='20' disabled id="result"></textarea>
+        <script>
+            document.getElementById('fileInput').addEventListener('change', function(event) {
+                const file = event.target.files[0];
+                console.log(file);
+                if (file) {
+                    const info = {
+                        name: file.name
+                        ,size: file.size
+                    };
+                    document.getElementById('result').value = JSON.stringify(info);
+                }
+            });
+        </script>
+    </body>
+</html>
