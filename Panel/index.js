@@ -135,7 +135,7 @@ const PanelHostUpload = () => {
     //Construct config
     const config = {
         outputPath: InputOutputFilePath.value
-        ,chunkLengh: parseInt(InputChunkLength.value)
+        ,chunkLenght: parseInt(InputChunkLength.value)
         ,maxFileSize: parseInt(InputMaxiumumFileSize.value)
     };
     //call API

@@ -6,6 +6,12 @@ Tunnel Messages:
     Download:
         Input:
             JSON config
+            --form:
+                {
+                    fileName: STRING    //output filename of the file
+                    ,fileLength: INT    //final size of the file
+                    ,chunkLength: INT   //maximum chunk length
+                }
             --event: on start
             --event: ANYTIME before the downloading starts
             DATA of next chunk of the file
@@ -23,6 +29,11 @@ Tunnel Messages:
     Upload:
         Input: 
             JSON config
+            --form:
+                {
+                    maxLength: INT    //maximum lenght of the whole transfer
+                    ,chunkLength: INT //exact length of a single chunk
+                }
             --event: on start
             next;
             --event: When the agent will write the chunk correctly.
@@ -35,21 +46,20 @@ Tunnel Messages:
         --event: when key expires
         --event2: when idle (optional)
         --event3: when earlier/internal restricions will be broken.
+        --event4: when the client closes first
 //----------------------------------------------------------------
     Upload(client):
         Input:
-            JSON file info
-            --event: on start
             DATA
             event: next;
         Output:
             next;
-            --event: when the previous chunk of the file will be delivered.
+            --event: when the previous chunk of the file will be delivered, or if this is the first.
             --event2: when the file info will be accepted by the initiator(Tunnel Agent).
         Close;
         --event: when idle.
-        --event2: when the file info will not be accepted by the initiator(Tunnel Agent).
-        --event3: when the client will break the rule of not waiting for a permission to send.
+        --event2: when the client will break the rule of not waiting for a permission to send.
+        --event3: when the client will send a message of length greater than the earlier set chunk lenght
 //----------------------------------------------------------------
 Tunnel API:
 
@@ -124,7 +134,7 @@ Agent API:
         {
             outputPath: STRING //relative output file path of the transfered file
             ,maxFileSize: INT //maximum size of the all summed chunks' lengths (used by the tunnel, to block the client from sending more than actually needs)
-            ,chunkLengh: INT //length of a single chunk transfered by the client, through the tunnel
+            ,chunkLenght: INT //length of a single chunk transfered by the client, through the tunnel
             //OPTIONAL ONLY:
             ,overwrite: BOOLEAN //overwrite existing file, if necessary.
         }

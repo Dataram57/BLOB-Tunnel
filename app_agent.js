@@ -19,8 +19,9 @@ const openedTransferMaxCount = 30;
 const downloadServiceSecretKey = 'zaq1"WSX';
 //Upload Service
 const uploadServiceSecretKey = 'ZAQ!2wsx';
+const uploadServiceLockFiles = true;
 //Additional Callbacker
-const callbackerModulePath = './app_agent_callbacker.js';
+const Boss = require('./boss/boss.js');
 //Used functions:
 //StartedDownloading(session)
 //FinishedDownloading(session)
@@ -34,18 +35,13 @@ const callbackerModulePath = './app_agent_callbacker.js';
 
 console.clear();
 const func_NULL = () => {};
-const Callbacker = (callbackerModulePath) ? require(callbackerModulePath) : {
-    StartedDownloading: func_NULL
-    ,FinishedDownloading: func_NULL
-    ,StartedUploading: func_NULL
-    ,FinishedUploading : func_NULL
-};
 const ChainArray = require('./ChainArray.js');
 const express = require('express');
 const WebSocket = require('ws');
 const fs = require('fs');
 const RandomAccessFile = require('random-access-file');
 const { json } = require('express');
+const { rejects } = require('assert');
 const app = express();
 //#endregion
 
@@ -232,12 +228,12 @@ app.get(apiPrefix + 'startUpload/*', async function (req, res) {
     //read config
     const config = ReadJSONConfigFromURL(req.url);
     //check config parameters
-    if(typeof(config.outputPath) != 'string' || typeof(config.chunkLengh) != 'number' || typeof(config.maxFileSize) != 'number'){
+    if(typeof(config.outputPath) != 'string' || typeof(config.chunkLenght) != 'number' || typeof(config.maxFileSize) != 'number'){
         res.send({error: 'Config is not in a right format.'});
         return;
     }
     //check numbers
-    if(config.chunkLengh <= 0){
+    if(config.chunkLenght <= 0){
         res.send({error: "$chunkLength can not be below or equal to 0."});
         return;
     }
@@ -245,13 +241,12 @@ app.get(apiPrefix + 'startUpload/*', async function (req, res) {
         res.send({error: "$maxFileSize can not be below or equal to 0."});
         return;
     }
-    //check file existence
-    config.filePath = baseDir + config.filePath;
-    if(await FileExists(config.filePath)){
-        //check overwrite
-    }
+    //correct the path
+    config.outputPath = baseDir + config.outputPath;
+    //try to open an upload session
+    const result = await CreateUploadSession(config);
     //end
-    res.send({});
+    res.send(result);
 });
 
 //#endregion
@@ -361,6 +356,9 @@ const SetupDownloadSessionEvents = (socket) => {
 
     //on message
     socket.on("message", msg => {
+        //ignore if closing
+        if(socket._key === null)
+            return;
         //key
         if(msg.subarray(0,4).toString() == 'key;'){
             //key is not set yet or has changed
@@ -445,5 +443,201 @@ const CloseDownloadSession = (socket) => {
 
 //Chain of all successfully initiated and allowed to be handled, sessions.
 const uploadSessionChain = new ChainArray();
+
+//Opens up an upload special File Writer
+const OpenUploadWriteStream = (filePath, lockFile) => {
+    return new Promise(resolve => {
+        if(uploadServiceLockFiles || lockFile){
+            fs.open(filePath, 'w', (err, fd) => {
+                if(err){
+                    resolve(err.code);
+                }
+                else
+                    resolve(fs.createWriteStream(null, { fd, encoding: 'binary' }));
+            });
+        }
+        else{
+            try{
+                resolve(fs.createWriteStream(filePath, { encoding: 'binary' }));
+            }
+            catch(e){
+                resolve(e.code);
+            }
+        }
+    });
+};
+
+//Assigns upload writer behaviour to the given File writer
+const SetupUploadWriterEvents = (writer) => {
+    //on open
+    writer.on('open', () => {
+        console.log('opened');
+    });
+
+    //on error
+    writer.on('error', (err) => {
+        console.error('Error writing file:', err);
+        CloseUploadSession(writer._socket);
+    });
+
+    //on finish
+    writer.on('finish', () => {
+        console.log('Binary data written to output.bin');
+    });
+};
+
+//Assigns upload behaviour to the given WebSocket connection
+const SetupUploadSessionEvents = (socket) => {
+    //on open
+    socket.on("open", e => {
+        //Send the setup
+        const setup = {
+            maxLength: socket._maxLength
+            ,chunkLength: socket._chunkLenght
+        };
+        socket.send(JSON.stringify(setup));
+    });
+
+    //on message
+    socket.on("message", msg => {
+        //ignore if closing
+        if(socket._key === null)
+            return;
+        //check if writing began
+        if(socket._length < 0){
+            //The client has not started uploading yet
+            //The tunnel may now return only commands
+            //key
+            if(msg.subarray(0,4).toString() == 'key;'){
+                //key is not set yet or has changed
+                socket._key = msg.subarray(4).toString();
+                //call the callback
+                if(socket._resolver){
+                    socket._resolver({key: socket._key});
+                    socket._resolver = undefined;
+                }
+            }
+        }
+        else{
+            //The client is ready for responding
+            //Tunnel sends only client's chunk
+
+            socket._length < socket._maxLength;
+                socket._length += msg._length;
+                writer.write(msg, 'binary');
+        }
+    });
+
+    //on close
+    socket.on("close", e => {
+        console.log(e);
+        //recognize the state
+        //...
+        if(socket._length < 0){
+            //The transfer was not even started yet.
+            //Close session
+            CloseUploadSession(socket);
+            //Call the boss
+            Boss;
+        }
+        else if(socket._length < socket._maxLength){
+            //The transfer was started, but there was a problem in the transfer
+            //Close session
+            CloseUploadSession(socket);
+            //Call the boss
+            Boss;
+        }
+        else{
+            //The transfer has been finished, and more or equal of amount of demanded data has been transfered
+            //Close session
+            CloseUploadSession(socket);
+            //Call the boss
+            Boss;
+        }
+    });
+
+    //on error
+    socket.on("error", err => {
+        console.log(err);
+        //recognize the state
+        //...
+        if(socket._length < 0){
+            //The transfer was not even started yet.
+            //Close session
+            CloseUploadSession(socket);
+            //Call the boss
+            Boss;
+        }
+        else if(socket._length < socket._maxLength){
+            //The transfer was started, but there was a problem in the transfer
+            //Close session
+            CloseUploadSession(socket);
+            //Call the boss
+            Boss;
+        }
+        else{
+            //The transfer has been finished, and more or equal of amount of demanded data has been transfered
+            //Close session
+            CloseUploadSession(socket);
+            //Call the boss
+            Boss;
+        }
+    });
+};
+
+//Creates the upload session
+const CreateUploadSession = (config) => {
+    return new Promise(async resolve => {
+        //Create write stream
+        const writeStream = await OpenUploadWriteStream(config.outputPath, true);
+        //Check if result is error
+        if(typeof(writeStream) == 'string'){
+            console.log(writeStream);
+            resolve({error: 'Code ' + writeStream});
+            return;
+        }
+        //Assign writer behaviour
+        SetupUploadWriterEvents(writeStream);
+        //Create the WS connection
+        const socket = new WebSocket(GetWebSocketURL(), {
+            perMessageDeflate: false,
+            headers: {
+                key: uploadServiceSecretKey
+            }
+        });
+        //file writing
+        socket._fw = writeStream;                   //File writer object
+        socket._chunkLenght = config.chunkLength;   //Lenght of a single chunk
+        socket._maxLength = config.maxFileSize;     //Max length of the file
+        socket._length = -1;                        //current lenght of the written date ((< maxLength) means it needs. (= maxLength) means it has filled up all the data)
+        //state
+        socket._key = '';                           //invitation key
+        socket._resolver = resolve;                 //called once and only when key is recieved
+        //Assign socket to the writer
+        writeStream._socket = socket;
+        //add to chain
+        uploadSessionChain.Add(socket);
+        //events
+        SetupUploadSessionEvents(socket);
+    });
+};
+
+//safely closes the Upload session
+const CloseUploadSession = (socket) => {
+    //don't call it again
+    if(socket._key === null)
+        return;
+    //mark as it is being closed
+    socket._key = null;
+    //close writer
+    socket._fw.close((err) => {
+        if(err)
+            console.log(err);
+        //delist from the chain
+        uploadSessionChain.Remove(socket);
+        //close WebSocket
+        socket.close();
+    });
+};
 
 //#endregion
