@@ -33,6 +33,7 @@ const maxClientDelayInMessage = 10 * 1000;
 //#region Requirements and consts/utilities
 
 console.clear();
+console.log('================================================================');
 const appLaunchDate = new Date();
 const http = require('http');
 const WebSocket = require('ws');
@@ -287,7 +288,7 @@ const SetupUploadServiceSocket = (socket) => {
     socket._maxLength = -1;
     socket._chunkLenght = 0;
     //client target
-    socket._source = null;
+    socket._client = null;
     //checks
     socket._lastMessageDate = new Date();
     //Cache chain properties
@@ -299,7 +300,7 @@ const SetupUploadServiceSocket = (socket) => {
         //update socket last message date
         socket._lastMessageDate = new Date();
         //check status
-        if(!socket._source){
+        if(!socket._client){
             //correct or apply setup/config
             //get setup
             const setup = JSON.parse(message);
@@ -319,22 +320,11 @@ const SetupUploadServiceSocket = (socket) => {
             }
         }
         else{
-            //write tunneled data to the responese
-            socket._client.write(message);
-            //console.log(message.toString());
-            //shrink file size
-            socket._fileLength -= message.length;
-            //check remaining file size
-            if(socket._fileLength <= 0){
-                console.log('finished writing data');
-                //end downloading
-                socket._client.end();
-                //destroy ws
-                //socket was removed from the chain earlier
-                socket.terminate();
+            //The upload is going
+            if(msg.subarray(0,5).toString() == 'next;'){
+                //request a next chunk from the user
+                socket._client.send('next;');
             }
-            //ask for next
-            socket.send("next;");
         }
     });
 

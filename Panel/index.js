@@ -1,6 +1,15 @@
 const apiURL = '/api/';
+const uploadTesterURL = 'upload-tester/';
+const tunnelDomain = '';
+const tunnelUseSSL = false;
 
 const Log = (e) => console.log(e);
+
+const GetTunnelWSAddress = () => {
+    if(tunnelUseSSL)
+        return 'wss://' + tunnelDomain;
+    return 'ws://' + tunnelDomain;
+};
 
 //Fetch API without any callback
 const FetchAsyncGET = async (command) => {
@@ -122,7 +131,7 @@ const PanelHostDownload = () => {
 //-InputMaxiumumFileSize
 //-ButtonHostUpload
 //-CreateUploadSessionResponse
-//-CreateUploadSessionCheckBoxOverwrite
+//-CreateUploadSessionCheckBoxLock
 //-CreateUploadSessionCheckBoxRefresh
 const PanelHostUpload = () => {
     Log('Called a request to host a upload session...');
@@ -131,25 +140,60 @@ const PanelHostUpload = () => {
     InputChunkLength.disabled = true;
     InputMaxiumumFileSize.disabled = true;
     ButtonHostUpload.disabled = true;
-    CreateUploadSessionCheckBoxOverwrite.disabled = true;
+    CreateUploadSessionCheckBoxLock.disabled = true;
     //Construct config
     const config = {
         outputPath: InputOutputFilePath.value
         ,chunkLenght: parseInt(InputChunkLength.value)
         ,maxFileSize: parseInt(InputMaxiumumFileSize.value)
+        ,lock: CreateUploadSessionCheckBoxLock.checked
     };
     //call API
     FetchGet('startUpload/' + encodeURIComponent(JSON.stringify(config)), (res) => {
-        
-        console.log(res);
-
-
+        let msg = '';
+        if(typeof(res) == 'object'){
+            //error
+            msg = 'Error with the connection to the API.';
+        }
+        else{
+            //string response
+            try{
+                //convert
+                res = JSON.parse(res);
+                //read error
+                if(res.error)
+                    msg = res.error;
+                else if(res.key){
+                    msg = 'Download Key: ' + GetCopyAbleHTMLText(res.key) + '<br>';
+                    //generate a helpful link
+                    const config2 = {
+                        key: res.key
+                        ,chunkLenght: config.chunkLenght
+                        ,maxFileSize: config.maxFileSize
+                        ,tunnelAddres: GetTunnelWSAddress()
+                    };
+                    const url = uploadTesterURL + '#' + encodeURIComponent(JSON.stringify(config2));
+                    msg += 'Click <a target="_blank" href="' + url + '">here</a> to test this upload.';
+                }
+                else
+                    msg = "Response does not contain neither a key, nor an error.";
+            }
+            catch(e){
+                Log(e);
+                msg = 'Error with the JSON format.';
+            }
+        }
+        //msg
+        CreateUploadSessionResponse.innerHTML = msg;
         //enable
         InputOutputFilePath.disabled = false;
         InputChunkLength.disabled = false;
         InputMaxiumumFileSize.disabled = false;
         ButtonHostUpload.disabled = false;
-        CreateUploadSessionCheckBoxOverwrite.disabled = false;
+        CreateUploadSessionCheckBoxLock.disabled = false;
+        //checkbox
+        if(CreateUploadSessionCheckBoxRefresh.checked)
+            PanelRefreshList();
     });
 };
 
