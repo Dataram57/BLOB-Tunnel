@@ -5,7 +5,6 @@ const InitUploadTesterPage = () => {
     if(config){
         LockInput(chunkLenghtInput, config.chunkLenght);
         LockInput(maxLengthInput, config.maxFileSize);
-        LockInput(inviteKeyInput, config.key);
         LockInput(tunnelAddressInput, config.tunnelAddres);
     }
 };
@@ -38,18 +37,20 @@ const ClickStartUpload = () => {
     //get file
     const file = fileInput.files[0];
     if (file) {
-        
-        /*
+        if(file.size != maxLengthInput.value){
+            console.log('wrong file size!!!!!!!!!!!!!');
+        }
+        //create tunnel
         blobTunnel = new BLOBUtilities.BLOBUploader({
-            url: ''
-            ,chunkLength: 32
-            ,fileSize: file.size
+            tunnel: tunnelAddressInput.value
+            ,chunkLength: chunkLenghtInput.value
+            ,maxTransfer: maxLengthInput.value
             ,file: file
         });
-        blobTunnel.ReadNextChunk((result) => {
-            console.log(result);
-        });
-        */
+        //set events
+        //...
+        //start reading
+        blobTunnel.Start();
     }
 };
 

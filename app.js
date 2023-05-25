@@ -354,6 +354,13 @@ const SetupUploadServiceSocket = (socket) => {
 const SetupUploadClientSocket = (socket) => {
     //socket._target links to the upload destination
     console.log(666666666666666);
+
+    socket.on("message", message => {
+        console.log(message);
+    });
+    
+    //initiate
+    socket.send('next;');
 };
 
 //#endregion
@@ -410,8 +417,12 @@ wsServer.on('connection', (socket, req) => {
             //check length
             target = target.substring(8);
             if(target.length == uploadSessionKeyLength){
+                //find matching session key
                 socket._target = FindUploadSession(target);
                 if(socket._target){
+                    //delist session
+                    uploadSessionChain.Remove(socket._target);
+                    //Setup the socket
                     SetupUploadClientSocket(socket);
                     return;
                 }
