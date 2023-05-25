@@ -210,4 +210,13 @@ const InitPanel = () => {
     UploadServiceRowsStart = UploadServiceRows.innerHTML;
     //refresh
     PanelRefreshList();
+    //add 
+    InputFileInfo.addEventListener("change", () => {
+        //check if disabled
+        if(!InputOutputFilePath.disabled){
+            const file = InputFileInfo.files[0];
+            InputOutputFilePath.value = file.name;
+            InputMaxiumumFileSize.value = file.size;
+        }
+    });
 };

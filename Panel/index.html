@@ -99,17 +99,17 @@
                         List auto refersh
                     </p>
                     <button onclick="PanelHostUpload()" id="ButtonHostUpload">Host</button>
-                    <h4>Response:</h4>
-                    <p id="CreateUploadSessionResponse">...</p>
                 </div>
                 <div class='box1'>
-                    <h2>Fill with file size</h2>
+                    <h2>Fill with file info</h2>
                     <p>
                         Target file: 
-                        <input type="file" id="fileInput">
+                        <input type="file" id="InputFileInfo">
                     </p>
                 </div>
             </div>
+            <h4>Response:</h4>
+            <p id="CreateUploadSessionResponse">...</p>
         </div>
         <div class="break"></div>
         <h1>End</h1>
@@ -134,6 +134,7 @@
             const ButtonHostUpload = document.getElementById('ButtonHostUpload');
             const CreateUploadSessionResponse = document.getElementById('CreateUploadSessionResponse');
             const CreateUploadSessionCheckBoxLock = document.getElementById('CreateUploadSessionCheckBoxLock');
+            const InputFileInfo = document.getElementById('InputFileInfo');
             const CreateUploadSessionCheckBoxRefresh = document.getElementById('CreateUploadSessionCheckBoxRefresh');
             //
             InitPanel();
