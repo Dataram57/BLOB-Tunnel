@@ -353,6 +353,7 @@ const SetupUploadServiceSocket = (socket) => {
 
 const SetupUploadClientSocket = (socket) => {
     //socket._target links to the upload destination
+    console.log(666666666666666);
 };
 
 //#endregion
@@ -376,34 +377,49 @@ const wsServer = new WebSocket.Server(
 
 
 wsServer.on('connection', (socket, req) => {    
-    //check key(purpose of the connection)
-    //it is important to not declare variables from this scope (due to cheaper/faster memory handling)
-    if(req.headers['key'] === downloadServiceSecretKey){
-        //client is the future source of file for download service
-        //check counter
-        if(downloadSessionCounter >= downloadSessionMaxCount){
-            //Too much of download session hanging
-            socket.close();
-            return;
-        }
-        //setup download socket
-        SetupDownloadSocket(socket);
-    }else if(req.headers['key'] === uploadServiceSecretKey){
-        //client is the future endpoint of upload service
-        //setup upload socket
-        SetupUploadServiceSocket(socket);
-    }
-    else{
-        //check upload invitation key
-        socket._target = FindUploadSession(req.headers['key']);
-        if(socket._target)
+    //Check if admin
+    if(req.headers['key']){
+        //check key(purpose of the connection)
+        //it is important to not declare variables from this scope (due to cheaper/faster memory handling)
+        if(req.headers['key'] === downloadServiceSecretKey){
+            //client is the future source of file for download service
+            //check counter
+            if(downloadSessionCounter >= downloadSessionMaxCount){
+                //Too much of download session hanging
+                socket.close();
+                return;
+            }
+            //setup download socket
+            SetupDownloadSocket(socket);
+        }else if(req.headers['key'] === uploadServiceSecretKey){
+            //client is the future endpoint of upload service
             //setup upload socket
-            SetupUploadClientSocket(socket);
+            SetupUploadServiceSocket(socket);
+        }
         else{
             //close hacker's connection
             socket.terminate();
             return;
         }
+    }
+    //Connection is using URL parameters instead of headers
+    else{
+        //check url parameters
+        let target = req.url;
+        if(target.substring(0,8) == '/upload/'){
+            //check length
+            target = target.substring(8);
+            if(target.length == uploadSessionKeyLength){
+                socket._target = FindUploadSession(target);
+                if(socket._target){
+                    SetupUploadClientSocket(socket);
+                    return;
+                }
+            }
+        }
+        //close hacker's connection
+        socket.terminate();
+        return;
     }
 });
 

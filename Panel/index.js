@@ -2,6 +2,8 @@ const apiURL = '/api/';
 const uploadTesterURL = 'upload-tester/';
 const tunnelAddress = 'localhost';
 const tunnelUseSSL = false;
+const tunnelUploadDir = '/upload/';
+const tunnelDownloadDir = '/download/';
 
 const Log = (e) => console.log(e);
 
@@ -10,6 +12,9 @@ const GetTunnelWSAddress = () => {
         return 'wss://' + tunnelAddress;
     return 'ws://' + tunnelAddress;
 };
+
+const GetTunnelUploadAddress = (key) => GetTunnelWSAddress() + tunnelUploadDir + key;
+const GetTunnelDownloadAddress = (key) => GetTunnelWSAddress() + tunnelDownloadDir + key;
 
 //Fetch API without any callback
 const FetchAsyncGET = async (command) => {
@@ -167,10 +172,9 @@ const PanelHostUpload = () => {
                     msg = 'Download Key: ' + GetCopyAbleHTMLText(res.key) + '<br>';
                     //generate a helpful link
                     const config2 = {
-                        key: res.key
-                        ,chunkLenght: config.chunkLenght
+                        chunkLenght: config.chunkLenght
                         ,maxFileSize: config.maxFileSize
-                        ,tunnelAddres: GetTunnelWSAddress()
+                        ,tunnelAddres: GetTunnelUploadAddress(res.key)
                     };
                     const url = uploadTesterURL + '#' + encodeURIComponent(JSON.stringify(config2));
                     msg += 'Click <a target="_blank" href="' + url + '">here</a> to test this upload.';
