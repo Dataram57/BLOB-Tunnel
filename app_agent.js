@@ -1,10 +1,16 @@
 /*================================================================
 This application is an agent / a tool to communicate with the public tunnel, in order to establish some connection between private servers and the outside client.
+It is possible to:
+-Host a single file download tunnel.
+
+It is not yet possible to:
+-Host an upload file tunnel. (+ locking the file)
+
 //================================================================*/
 //#region Config
 //IO
 const baseDir = 'base/';        //Directory with 777 access
-const readChunkLength = 1024;
+const readChunkLenght = 1024;
 //API and Panel
 const serverPort = 6060;
 const apiPrefix = '/api/';
@@ -149,15 +155,15 @@ app.get(apiPrefix + 'list', function (req, res) {
     session = uploadSessionChain.head;
     i = uploadSessionChain.length;
     while(session){
-        res.write({
-            key: session._key
-            ,targetFile: session._targetFile
-            ,targetLength: session._targetLength
-            ,leftLength: session._leftLength
-        });
+        res.write(JSON.stringify({
+            key: KeyToString(session._key)
+            ,length: session._length
+            ,targetLength: session._maxLength
+            ,targetFile: 'dd'
+        }));
         session = session.chainFront;
         if(--i > 0)
-            res.send(',');
+            res.write(',');
     }
     res.write(']');
     //end JSON
@@ -171,7 +177,6 @@ app.get(apiPrefix + 'startDownload/*', async function (req, res) {
     if(args.length < 2 + apiPrefixSubCount){
         //error
         res.send({error:'URL does not contain all the necessary arguments.'});
-        res.end();
         return;
     }
     //read params
@@ -181,7 +186,6 @@ app.get(apiPrefix + 'startDownload/*', async function (req, res) {
     if(fileName.trim().length == 0){ 
         //error
         res.send({error:'$fileName is empty.'});
-        res.end();
         return;
     }
     //check file existance
@@ -192,14 +196,12 @@ app.get(apiPrefix + 'startDownload/*', async function (req, res) {
         if(!await FileExists(filePath)){
             //error
             res.send({error:'File at $filePath does not exist.'});
-            res.end();
             return;
         }
     }
     //create a tunnel
     const response = await CreateDownloadSession(filePath, fileName);
     res.send(response);
-    res.end();
 });
 
 //killDownload/$key
@@ -234,7 +236,7 @@ app.get(apiPrefix + 'startUpload/*', async function (req, res) {
     }
     //check numbers
     if(config.chunkLenght <= 0){
-        res.send({error: "$chunkLength can not be below or equal to 0."});
+        res.send({error: "$chunkLenght can not be below or equal to 0."});
         return;
     }
     if(config.maxFileSize <= 0){
@@ -349,7 +351,7 @@ const SetupDownloadSessionEvents = (socket) => {
         const setup = {
             fileName: socket._fileName
             ,fileSize: socket._length
-            , chunkLength: readChunkLength
+            ,chunkLenght: readChunkLenght
         };
         socket.send(JSON.stringify(setup));
     });
@@ -372,14 +374,14 @@ const SetupDownloadSessionEvents = (socket) => {
         //next
         else if(msg.subarray(0,5).toString() == 'next;'){
             //wants to send the next chunk of the data.
-            socket._fr.read(socket._offset, Math.min(readChunkLength, socket._length - socket._offset), (err, raw) => {
+            socket._fr.read(socket._offset, Math.min(readChunkLenght, socket._length - socket._offset), (err, raw) => {
                 if(err){
                     console.log(err)
                 }
                 //send chunk
                 socket.send(raw);
                 //next
-                socket._offset += readChunkLength;
+                socket._offset += readChunkLenght;
                 //check if EOF
                 if(socket._offset >= socket._length)
                     //Finish Session.
@@ -445,9 +447,9 @@ const CloseDownloadSession = (socket) => {
 const uploadSessionChain = new ChainArray();
 
 //Opens up an upload special File Writer
-const OpenUploadWriteStream = (filePath, lockFile) => {
+const CreateWriteStream = (filePath, lockFile) => {
     return new Promise(resolve => {
-        if(uploadServiceLockFiles || lockFile){
+        if(lockFile){
             fs.open(filePath, 'w', (err, fd) => {
                 if(err){
                     resolve(err.code);
@@ -460,8 +462,8 @@ const OpenUploadWriteStream = (filePath, lockFile) => {
             try{
                 resolve(fs.createWriteStream(filePath, { encoding: 'binary' }));
             }
-            catch(e){
-                resolve(e.code);
+            catch(err){
+                resolve(err.code);
             }
         }
     });
@@ -493,8 +495,9 @@ const SetupUploadSessionEvents = (socket) => {
         //Send the setup
         const setup = {
             maxLength: socket._maxLength
-            ,chunkLength: socket._chunkLenght
+            ,chunkLenght: socket._chunkLenght
         };
+        console.log(setup);
         socket.send(JSON.stringify(setup));
     });
 
@@ -587,38 +590,44 @@ const SetupUploadSessionEvents = (socket) => {
 
 //Creates the upload session
 const CreateUploadSession = (config) => {
-    return new Promise(async resolve => {
+    //The resolve can't be async, I think
+    return new Promise(resolve => {
         //Create write stream
-        const writeStream = await OpenUploadWriteStream(config.outputPath, true);
-        //Check if result is error
-        if(typeof(writeStream) == 'string'){
-            console.log(writeStream);
-            resolve({error: 'Code ' + writeStream});
-            return;
-        }
-        //Assign writer behaviour
-        SetupUploadWriterEvents(writeStream);
-        //Create the WS connection
-        const socket = new WebSocket(GetWebSocketURL(), {
-            perMessageDeflate: false,
-            headers: {
-                key: uploadServiceSecretKey
+        CreateWriteStream(config.outputPath, config.lockFile || uploadServiceLockFiles).then(
+            (writeStream) => {
+                //Check if result is error
+                if(typeof(writeStream) == 'string'){
+                    console.log(writeStream);
+                    resolve({error: 'Code ' + writeStream});
+                    return;
+                }
+                console.log(typeof(writeStream));
+                //Assign writer behaviour
+                SetupUploadWriterEvents(writeStream);
+                //Create the WS connection
+                const socket = new WebSocket(GetWebSocketURL(), {
+                    perMessageDeflate: false,
+                    headers: {
+                        key: uploadServiceSecretKey
+                    }
+                });
+                //file writing
+                socket._fw = writeStream;                   //File writer object
+                socket._chunkLenght = config.chunkLenght;   //Lenght of a single chunk
+                console.log(socket._chunkLenght);
+                socket._maxLength = config.maxFileSize;     //Max length of the file
+                socket._length = -1;                        //current lenght of the written date ((< maxLength) means it needs. (= maxLength) means it has filled up all the data)
+                //state
+                socket._key = '';                           //invitation key
+                socket._resolver = resolve;                 //called once and only when key is recieved
+                //Assign socket to the writer
+                writeStream._socket = socket;
+                //add to chain
+                uploadSessionChain.Add(socket);
+                //events
+                SetupUploadSessionEvents(socket);
             }
-        });
-        //file writing
-        socket._fw = writeStream;                   //File writer object
-        socket._chunkLenght = config.chunkLength;   //Lenght of a single chunk
-        socket._maxLength = config.maxFileSize;     //Max length of the file
-        socket._length = -1;                        //current lenght of the written date ((< maxLength) means it needs. (= maxLength) means it has filled up all the data)
-        //state
-        socket._key = '';                           //invitation key
-        socket._resolver = resolve;                 //called once and only when key is recieved
-        //Assign socket to the writer
-        writeStream._socket = socket;
-        //add to chain
-        uploadSessionChain.Add(socket);
-        //events
-        SetupUploadSessionEvents(socket);
+        );
     });
 };
 

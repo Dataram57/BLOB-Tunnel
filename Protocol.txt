@@ -101,7 +101,7 @@ Agent API:
                 key: STRING;
                 ,targetFile: STRING 
                 ,targetLength: INT //target amount of DATA to be over/-written
-                ,leftLength: INT //left amount of DATA to be recieved and written.
+                ,length: INT //Amount of data that has been received.
             }
         ]
     }

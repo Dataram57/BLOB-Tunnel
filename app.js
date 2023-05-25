@@ -179,8 +179,8 @@ const SetupDownloadSocket = (socket) => {
     socket._key = null;
     socket._fileLength = -1;
     socket._fileName = 'unnamed.thing';
-    //usage ._chunkLength is mixed with setTimout returned id
-    socket._chunkLength = 0;
+    //usage ._chunkLenght is mixed with setTimout returned id
+    socket._chunkLenght = 0;
     socket._client = null;
     socket._lastMessageDate = new Date();
     //Cache chain properties
@@ -201,9 +201,9 @@ const SetupDownloadSocket = (socket) => {
             //set parameters
             socket._fileName = setup.fileName;
             socket._fileLength = setup.fileSize;
-            socket._chunkLength = setup.chunkLength;
+            socket._chunkLenght = setup.chunkLenght;
             //generate the key
-            if(!socket.key){
+            if(!socket._key){
                 const key = GenerateDownloadKey();
                 console.log(key);
                 socket._key = key;
@@ -265,6 +265,9 @@ const SetupDownloadSocket = (socket) => {
 const uploadSessionCounter = 0;
 const uploadSessionChain = new ChainArray();
     //.length won't include sessions currently working(tunneling or setuping). Use uploadSessionCounter - uploadSessionChain.length to count busy
+
+const GenerateUploadKey = () => GenerateKey(uploadSessionKeyLength);
+
 const FindUploadSession = (key) => {
     let socket = uploadSessionChain.head;
     while(socket)
@@ -275,13 +278,91 @@ const FindUploadSession = (key) => {
     return null;
 };
 
-
 const SetupUploadServiceSocket = (socket) => {
+    console.log('Oh shitt!!!');
+    //save session
+    socket._key = null;
+    //data count
+    socket._length = 0;
+    socket._maxLength = -1;
+    socket._chunkLenght = 0;
+    //client target
+    socket._source = null;
+    //checks
+    socket._lastMessageDate = new Date();
+    //Cache chain properties
+    socket.chainBack = null;
+    socket.chainFront = null;
 
+    //on message
+    socket.on("message", message => {
+        //update socket last message date
+        socket._lastMessageDate = new Date();
+        //check status
+        if(!socket._source){
+            //correct or apply setup/config
+            //get setup
+            const setup = JSON.parse(message);
+            //check setup
+            console.log(setup);
+            //set parameters
+            socket._maxLength = setup.maxLength;
+            socket._chunkLenght = setup.chunkLenght;
+            //generate the key
+            if(!socket._key){
+                const key = GenerateUploadKey();
+                console.log(key);
+                socket._key = key;
+                socket.send("key;" + key);
+                //add to chain
+                uploadSessionChain.Add(socket);
+            }
+        }
+        else{
+            //write tunneled data to the responese
+            socket._client.write(message);
+            //console.log(message.toString());
+            //shrink file size
+            socket._fileLength -= message.length;
+            //check remaining file size
+            if(socket._fileLength <= 0){
+                console.log('finished writing data');
+                //end downloading
+                socket._client.end();
+                //destroy ws
+                //socket was removed from the chain earlier
+                socket.terminate();
+            }
+            //ask for next
+            socket.send("next;");
+        }
+    });
+
+    //on close
+    socket.on("close",e => {
+        //check if socket was in chain
+        if(socket._key)
+            downloadSessionChain.Remove(socket);
+        //destroy socket
+        socket.terminate();
+    });
+
+    //on error
+    socket.on('error', err => {
+        //check if it was in the chain
+        if(socket._key)
+            downloadSessionChain.Remove(socket);
+        //destroy socket
+        socket.terminate();
+
+        //potential error codes(err.code):
+        //WS_ERR_UNSUPPORTED_MESSAGE_LENGTH
+    });   
+    
 };
 
 const SetupUploadClientSocket = (socket) => {
-
+    //socket._target links to the upload destination
 };
 
 //#endregion
@@ -324,8 +405,8 @@ wsServer.on('connection', (socket, req) => {
     }
     else{
         //check upload invitation key
-        socket._client = FindUploadSession(req.headers['key']);
-        if(socket._client)
+        socket._target = FindUploadSession(req.headers['key']);
+        if(socket._target)
             //setup upload socket
             SetupUploadClientSocket(socket);
         else{

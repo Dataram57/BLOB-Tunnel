@@ -61,7 +61,7 @@ const PanelRefreshList = async () => {
         i = -1;
         while(++i < json.UploadService.length){
             elem = json.UploadService[i];
-            UploadServiceRows.innerHTML += sr + GetCopyAbleHTMLText(elem.key) + br + elem.targetFile + br + elem.targetLength + br + elem.leftLength + er;
+            UploadServiceRows.innerHTML += sr + GetCopyAbleHTMLText(elem.key) + br + elem.targetFile + br + elem.targetLength + br + elem.length + er;
         }
     }
 };
@@ -141,6 +141,9 @@ const PanelHostUpload = () => {
     //call API
     FetchGet('startUpload/' + encodeURIComponent(JSON.stringify(config)), (res) => {
         
+        console.log(res);
+
+
         //enable
         InputOutputFilePath.disabled = false;
         InputChunkLength.disabled = false;
