@@ -1,14 +1,14 @@
 const apiURL = '/api/';
 const uploadTesterURL = 'upload-tester/';
-const tunnelDomain = '';
+const tunnelAddress = 'localhost';
 const tunnelUseSSL = false;
 
 const Log = (e) => console.log(e);
 
 const GetTunnelWSAddress = () => {
     if(tunnelUseSSL)
-        return 'wss://' + tunnelDomain;
-    return 'ws://' + tunnelDomain;
+        return 'wss://' + tunnelAddress;
+    return 'ws://' + tunnelAddress;
 };
 
 //Fetch API without any callback

@@ -4,52 +4,40 @@
         <title>File Chunk Reader</title>
     </head>
     <body>
-        <input type="file" id="fileInput">
+        <p>
+            Target file: 
+            <input type="file" id="fileInput">
+        </p>
+        <p>
+            Chunk length: 
+            <input type="number" id="chunkLenghtInput">
+        </p>
+        <p>
+            Max transfer length: 
+            <input type="number" id="maxLengthInput">
+        </p>
+        <p>
+            Invitation key: 
+            <input type="text" id="inviteKeyInput">
+        </p>
+        <p>
+            Tunnel address: 
+            <input type="text" id="tunnelAddressInput">
+        </p>
+        <br>
+        <button id="startUploadButton" onclick="ClickStartUpload()">Start uploading</button>
+        <!--JS-->
         <script src="BLOBUtilities.js"></script>
         <script src="index.js"></script>
         <script>
-            /*
-            async function readChunks(file) {
-                const chunkSize = 32; // Number of bytes per chunk
-                let offset = 0; // Current offset in the file
-
-                while (offset < file.size) {
-                    const blob = file.slice(offset, offset + chunkSize);
-                    const chunk = await readChunk(blob);
-
-                    // Process the chunk
-                    console.log(`Chunk ${offset}-${offset + chunk.byteLength - 1}:`, new Uint8Array(chunk));
-
-                    // Update the offset
-                    offset += chunk.byteLength;
-                }
-            }
-
-            function readChunk(blob) {
-                return new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = () => resolve(reader.result);
-                    reader.onerror = () => reject(reader.error);
-                    reader.readAsArrayBuffer(blob);
-                });
-            }
-            */
-            let blobTunnel = null;
-            document.getElementById('fileInput').addEventListener('change', function(event) {
-                const file = event.target.files[0];
-                console.log(file);
-                if (file) {
-                    blobTunnel = new BLOBUtilities.BLOBUploader({
-                        url: ''
-                        ,chunkLength: 32
-                        ,fileSize: file.size
-                        ,file: file
-                    });
-                    blobTunnel.ReadNextChunk((result) => {
-                        console.log(result);
-                    });
-                }
-            });
+            const fileInput = document.getElementById('fileInput');
+            const chunkLenghtInput = document.getElementById('chunkLenghtInput');
+            const maxLengthInput = document.getElementById('maxLengthInput');
+            const inviteKeyInput = document.getElementById('inviteKeyInput');
+            const tunnelAddressInput = document.getElementById('tunnelAddressInput');
+            const startUploadButton = document.getElementById('startUploadButton');
+            //
+            InitUploadTesterPage();
         </script>
     </body>
 </html>

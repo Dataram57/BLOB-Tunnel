@@ -263,7 +263,6 @@ app.get('/', function (req, res) {
 //Simple Panel explorer
 app.get(panelPrefix + '*', function (req, res) {
     let target = req.originalUrl.substring(panelPrefix.length).trim();
-    console.log(target);
     //every file must have an extension
     //otherwise it will be treated as index.html
     const i = target.lastIndexOf('/') - target.lastIndexOf('.');
