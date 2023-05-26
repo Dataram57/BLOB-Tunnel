@@ -7,11 +7,11 @@ It is not yet possible to:
 -Create a WebSocket connection to transfer/upload outside client's file to a private server, through this service.
 
 //================================================================*/
+
 //#region Config
 const serverPort = 80;
 //WS server
 const wsPort = serverPort;
-const wsSecretKey = 'zaq1"WSX';
 const wsMaxPayLoad = 1024;
 //Download Service
 const downloadServiceSecretKey = 'zaq1"WSX';
@@ -296,14 +296,15 @@ const SetupUploadServiceSocket = (socket) => {
     socket.chainFront = null;
 
     //on message
-    socket.on("message", message => {
+    socket.on("message", msg => {
+        console.log(msg);
         //update socket last message date
         socket._lastMessageDate = new Date();
         //check status
         if(!socket._client){
             //correct or apply setup/config
             //get setup
-            const setup = JSON.parse(message);
+            const setup = JSON.parse(msg);
             //check setup
             console.log(setup);
             //set parameters
@@ -342,7 +343,7 @@ const SetupUploadServiceSocket = (socket) => {
 
     //on close
     socket.on("close", e => {
-        console.log(err);
+        console.log(e);
         SafelyCloseUploadSession(socket);
     });
 
@@ -356,16 +357,25 @@ const SetupUploadServiceSocket = (socket) => {
 const SetupUploadClientSocket = (socket) => {
     //socket._target links to the upload destination
     console.log(666666666666666);
+    //apply also this socket to the main session socket
+    socket._client._client = socket;
+    //give permission to send data
+    socket._length = socket._client._chunkLength;
 
     //on message
     socket.on("message", message => {
+        console.log(message);
         //Substract the length
+        console.log(socket._length);
         socket._length -= message.length;
+        console.log(socket._length);
         //check permisionned length
         if(socket._length < 0){
             console.log("FFUCIING HAKAR");
             return;
         }
+        //block permission
+        socket._length = 0;
         //nomatter what the f he is sending
         //forward this chunk of data
         socket._client.send(message);
@@ -381,6 +391,7 @@ const SetupUploadClientSocket = (socket) => {
 
     //on error
     socket.on("err", err => {
+        //.code = WS_ERR_UNSUPPORTED_MESSAGE_LENGTH
         console.log(err);
         //close him and the destination
         socket._client.close();

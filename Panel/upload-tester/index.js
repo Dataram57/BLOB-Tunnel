@@ -43,9 +43,10 @@ const ClickStartUpload = () => {
         //create tunnel
         blobTunnel = new BLOBUtilities.BLOBUploader({
             tunnel: tunnelAddressInput.value
-            ,chunkLength: chunkLengthInput.value
-            ,maxTransfer: maxLengthInput.value
+            ,chunkLength: parseInt(chunkLengthInput.value)
+            ,maxTransfer: parseInt(maxLengthInput.value)
             ,file: file
+            ,fileSize: file.size
         });
         //set events
         //...

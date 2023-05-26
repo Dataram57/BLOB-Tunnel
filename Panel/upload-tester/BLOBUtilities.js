@@ -16,7 +16,6 @@ const BLOBUtilities = {
             this.onerror = MakeSafeFunc(config.onerror);
             //tunnel
             this.tunnel = config.tunnel;
-            this.maxTransfer = config.maxTransfer;
             this.socket = null;
         }
 
@@ -31,19 +30,20 @@ const BLOBUtilities = {
                 //call event
                 this.onopen();
                 //send next chunk of data
-                SendNextChunk();
+                this.SendNextChunk();
             });
 
             //on message
             this.socket.addEventListener("message", msg => {
                 //check command
                 const command = msg.data.toString().trim();
+                console.log(command);
                 if(command == 'next;'){
                     //wants next chunk of data
                     //call event
                     this.onprogress();
                     //send next chunk of data
-                    SendNextChunk();
+                    this.SendNextChunk();
                 }
                 else{
                     console.log('Unknown command:', command);
@@ -66,7 +66,7 @@ const BLOBUtilities = {
             console.log('closing...');
             //safely close connection
             if(this.socket)
-                this.socket.close()
+                this.socket.close();
             //call event
             this.onfinish();
         }
@@ -78,6 +78,7 @@ const BLOBUtilities = {
                     console.log(err);
                 }
                 else if(data){
+                    console.log(data);
                     //send next chunk of data
                     this.socket.send(data);
                 }
@@ -99,18 +100,22 @@ const BLOBUtilities = {
             }
             //define consts
             const reader = new FileReader();
-            const blob = this.file.slice(this.fileOffset, this.fileOffset + this.chunkLength);
+            const step = Math.min(this.chunkLength, this.fileSize - this.fileOffset);
+            const blob = this.file.slice(this.fileOffset, this.fileOffset + step);
             //apply reader events
             //on success
             reader.onload = () => {
-                callback(null, new Uint8Array(reader.result));
+                //convert
+                const convert = new Uint8Array(reader.result);
+                //callback
+                callback(null, convert);
             };
             //on error
             reader.onerror = () => {
                 callback(reader.error, null);
             };
             //change offset
-            this.fileOffset += this.chunkLength;
+            this.fileOffset += step;
             //call the reader
             reader.readAsArrayBuffer(blob);
         }

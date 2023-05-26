@@ -504,6 +504,7 @@ const SetupUploadSessionEvents = (socket) => {
 
     //on message
     socket.on("message", msg => {
+        console.log(msg);
         //ignore if closing
         if(socket._key === null)
             return;
@@ -520,16 +521,34 @@ const SetupUploadSessionEvents = (socket) => {
                     socket._resolver({key: socket._key});
                     socket._resolver = undefined;
                 }
+                //listen for chunks
+                socket._length = 0;
             }
         }
         else{
             //The client is ready for responding
             //Tunnel sends only client's chunk
-
+            //calculate left length
+            const left = socket._maxLength - socket._length;
+            console.log(left);
             //check left size
-            if(socket._length < socket._maxLength) {
-                socket._length += msg._length;
-                writer.write(msg, 'binary');
+            //check if message size brokes the guidelines
+            if(msg.length == Math.min(left, socket._chunkLength)){
+                //message has correct length, no need to trim
+                socket._fw.write(msg, 'binary');
+                socket._length += msg.length;
+                //check if EOF
+                if(socket._length >= socket._maxLength){
+                    //close
+                    CloseUploadSession(socket);
+                }
+                else{
+                    //request next chunk
+                    socket.send('next;');
+                }
+            }
+            else{
+                console.log('message has wrong length');
             }
         }
     });
