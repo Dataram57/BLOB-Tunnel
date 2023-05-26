@@ -20,8 +20,15 @@
             Tunnel address: 
             <input type="text" id="tunnelAddressInput">
         </p>
+        Progress bar: <span id="progress">?% (? bytes)</span>
+        <div style='max-width: 200px; margin: 10px; border: solid 3px black; padding: 5px;'>
+            <div id="progressBar" style="height: 24px; background-color: green; width: 0%;"></div>
+        </div>
         <br>
         <button id="startUploadButton" onclick="ClickStartUpload()">Start uploading</button>
+        <p>
+            Result: <span id='result'>...</span>
+        </p>
         <!--JS-->
         <script src="BLOBUtilities.js"></script>
         <script src="index.js"></script>
@@ -31,6 +38,11 @@
             const maxLengthInput = document.getElementById('maxLengthInput');
             const tunnelAddressInput = document.getElementById('tunnelAddressInput');
             const startUploadButton = document.getElementById('startUploadButton');
+            const progress = document.getElementById('progress');
+            const progressBar = document.getElementById('progressBar');
+            const result = document.getElementById('result');
+            //
+            var blobTunnel = null;
             //
             InitUploadTesterPage();
         </script>
