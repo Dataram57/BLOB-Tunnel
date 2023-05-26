@@ -180,8 +180,8 @@ const SetupDownloadSocket = (socket) => {
     socket._key = null;
     socket._fileLength = -1;
     socket._fileName = 'unnamed.thing';
-    //usage ._chunkLenght is mixed with setTimout returned id
-    socket._chunkLenght = 0;
+    //usage ._chunkLength is mixed with setTimout returned id
+    socket._chunkLength = 0;
     socket._client = null;
     socket._lastMessageDate = new Date();
     //Cache chain properties
@@ -202,7 +202,7 @@ const SetupDownloadSocket = (socket) => {
             //set parameters
             socket._fileName = setup.fileName;
             socket._fileLength = setup.fileSize;
-            socket._chunkLenght = setup.chunkLenght;
+            socket._chunkLength = setup.chunkLength;
             //generate the key
             if(!socket._key){
                 const key = GenerateDownloadKey();
@@ -286,7 +286,7 @@ const SetupUploadServiceSocket = (socket) => {
     //data count
     socket._length = 0;
     socket._maxLength = -1;
-    socket._chunkLenght = 0;
+    socket._chunkLength = 0;
     //client target
     socket._client = null;
     //checks
@@ -308,7 +308,7 @@ const SetupUploadServiceSocket = (socket) => {
             console.log(setup);
             //set parameters
             socket._maxLength = setup.maxLength;
-            socket._chunkLenght = setup.chunkLenght;
+            socket._chunkLength = setup.chunkLength;
             //generate the key
             if(!socket._key){
                 const key = GenerateUploadKey();
@@ -323,45 +323,81 @@ const SetupUploadServiceSocket = (socket) => {
             //The upload is going
             if(msg.subarray(0,5).toString() == 'next;'){
                 //request a next chunk from the user
+                //register length added successfully
+                socket._length += socket._chunkLength;
+                //check if EOF
+                if(socket._length >= socket._maxLength){
+                    //close all connections
+                    socket._client.close();
+                    socket.close();
+                    return;
+                }
+                //allow client to send the next chunk of file
+                socket._client._length = Math.min(socket._chunkLength, socket._maxLength - socket._length);
+                //send command
                 socket._client.send('next;');
             }
         }
     });
 
     //on close
-    socket.on("close",e => {
-        //check if socket was in chain
-        if(socket._key)
-            downloadSessionChain.Remove(socket);
-        //destroy socket
-        socket.terminate();
+    socket.on("close", e => {
+        console.log(err);
+        SafelyCloseUploadSession(socket);
     });
 
     //on error
     socket.on('error', err => {
-        //check if it was in the chain
-        if(socket._key)
-            downloadSessionChain.Remove(socket);
-        //destroy socket
-        socket.terminate();
-
-        //potential error codes(err.code):
-        //WS_ERR_UNSUPPORTED_MESSAGE_LENGTH
-    });   
-    
+        console.log(err);
+        SafelyCloseUploadSession(socket);
+    });
 };
 
 const SetupUploadClientSocket = (socket) => {
     //socket._target links to the upload destination
     console.log(666666666666666);
 
+    //on message
     socket.on("message", message => {
-        console.log(message);
+        //Substract the length
+        socket._length -= message.length;
+        //check permisionned length
+        if(socket._length < 0){
+            console.log("FFUCIING HAKAR");
+            return;
+        }
+        //nomatter what the f he is sending
+        //forward this chunk of data
+        socket._client.send(message);
     });
-    
-    //initiate
-    socket.send('next;');
+
+    //on close
+    socket.on("close", e => {
+        console.log(e);
+        //close him and the destination
+        socket._client.close();
+        socket.close();
+    });
+
+    //on error
+    socket.on("err", err => {
+        console.log(err);
+        //close him and the destination
+        socket._client.close();
+        socket.close();
+    });
 };
+
+const SafelyCloseUploadSession = (session) => {
+    //check if it was in the chain
+    if(session._key)
+        downloadSessionChain.Remove(session);
+    //close client
+    if(session._client)
+        session._client.close();
+    //close itself
+    session.close();
+}
 
 //#endregion
 
@@ -418,10 +454,11 @@ wsServer.on('connection', (socket, req) => {
             target = target.substring(8);
             if(target.length == uploadSessionKeyLength){
                 //find matching session key
-                socket._target = FindUploadSession(target);
-                if(socket._target){
+                socket._client = FindUploadSession(target);
+                if(socket._client){
                     //delist session
-                    uploadSessionChain.Remove(socket._target);
+                    uploadSessionChain.Remove(socket._client);
+                    socket._client._key = null;
                     //Setup the socket
                     SetupUploadClientSocket(socket);
                     return;

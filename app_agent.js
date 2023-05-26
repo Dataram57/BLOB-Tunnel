@@ -10,7 +10,7 @@ It is not yet possible to:
 //#region Config
 //IO
 const baseDir = 'base/';        //Directory with 777 access
-const readChunkLenght = 1024;
+const readChunkLength = 1024;
 //API and Panel
 const serverPort = 6060;
 const apiPrefix = '/api/';
@@ -231,13 +231,13 @@ app.get(apiPrefix + 'startUpload/*', async function (req, res) {
     //read config
     const config = ReadJSONConfigFromURL(req.url);
     //check config parameters
-    if(typeof(config.outputPath) != 'string' || typeof(config.chunkLenght) != 'number' || typeof(config.maxFileSize) != 'number'){
+    if(typeof(config.outputPath) != 'string' || typeof(config.chunkLength) != 'number' || typeof(config.maxFileSize) != 'number'){
         res.send({error: 'Config is not in a right format.'});
         return;
     }
     //check numbers
-    if(config.chunkLenght <= 0){
-        res.send({error: "$chunkLenght can not be below or equal to 0."});
+    if(config.chunkLength <= 0){
+        res.send({error: "$chunkLength can not be below or equal to 0."});
         return;
     }
     if(config.maxFileSize <= 0){
@@ -352,7 +352,7 @@ const SetupDownloadSessionEvents = (socket) => {
         const setup = {
             fileName: socket._fileName
             ,fileSize: socket._length
-            ,chunkLenght: readChunkLenght
+            ,chunkLength: readChunkLength
         };
         socket.send(JSON.stringify(setup));
     });
@@ -375,14 +375,14 @@ const SetupDownloadSessionEvents = (socket) => {
         //next
         else if(msg.subarray(0,5).toString() == 'next;'){
             //wants to send the next chunk of the data.
-            socket._fr.read(socket._offset, Math.min(readChunkLenght, socket._length - socket._offset), (err, raw) => {
+            socket._fr.read(socket._offset, Math.min(readChunkLength, socket._length - socket._offset), (err, raw) => {
                 if(err){
                     console.log(err)
                 }
                 //send chunk
                 socket.send(raw);
                 //next
-                socket._offset += readChunkLenght;
+                socket._offset += readChunkLength;
                 //check if EOF
                 if(socket._offset >= socket._length)
                     //Finish Session.
@@ -496,7 +496,7 @@ const SetupUploadSessionEvents = (socket) => {
         //Send the setup
         const setup = {
             maxLength: socket._maxLength
-            ,chunkLenght: socket._chunkLenght
+            ,chunkLength: socket._chunkLength
         };
         console.log(setup);
         socket.send(JSON.stringify(setup));
@@ -526,9 +526,11 @@ const SetupUploadSessionEvents = (socket) => {
             //The client is ready for responding
             //Tunnel sends only client's chunk
 
-            socket._length < socket._maxLength;
+            //check left size
+            if(socket._length < socket._maxLength) {
                 socket._length += msg._length;
                 writer.write(msg, 'binary');
+            }
         }
     });
 
@@ -614,10 +616,10 @@ const CreateUploadSession = (config) => {
                 });
                 //file writing
                 socket._fw = writeStream;                   //File writer object
-                socket._chunkLenght = config.chunkLenght;   //Lenght of a single chunk
-                console.log(socket._chunkLenght);
+                socket._chunkLength = config.chunkLength;   //Length of a single chunk
+                console.log(socket._chunkLength);
                 socket._maxLength = config.maxFileSize;     //Max length of the file
-                socket._length = -1;                        //current lenght of the written date ((< maxLength) means it needs. (= maxLength) means it has filled up all the data)
+                socket._length = -1;                        //current length of the written date ((< maxLength) means it needs. (= maxLength) means it has filled up all the data)
                 //state
                 socket._key = '';                           //invitation key
                 socket._resolver = resolve;                 //called once and only when key is recieved

@@ -149,7 +149,7 @@ const PanelHostUpload = () => {
     //Construct config
     const config = {
         outputPath: InputOutputFilePath.value
-        ,chunkLenght: parseInt(InputChunkLength.value)
+        ,chunkLength: parseInt(InputChunkLength.value)
         ,maxFileSize: parseInt(InputMaxiumumFileSize.value)
         ,lock: CreateUploadSessionCheckBoxLock.checked
     };
@@ -172,7 +172,7 @@ const PanelHostUpload = () => {
                     msg = 'Download Key: ' + GetCopyAbleHTMLText(res.key) + '<br>';
                     //generate a helpful link
                     const config2 = {
-                        chunkLenght: config.chunkLenght
+                        chunkLength: config.chunkLength
                         ,maxFileSize: config.maxFileSize
                         ,tunnelAddres: GetTunnelUploadAddress(res.key)
                     };

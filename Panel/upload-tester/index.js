@@ -3,7 +3,7 @@ const InitUploadTesterPage = () => {
     const config = ReadURLConfig();
     console.log(config);    
     if(config){
-        LockInput(chunkLenghtInput, config.chunkLenght);
+        LockInput(chunkLengthInput, config.chunkLength);
         LockInput(maxLengthInput, config.maxFileSize);
         LockInput(tunnelAddressInput, config.tunnelAddres);
     }
@@ -43,7 +43,7 @@ const ClickStartUpload = () => {
         //create tunnel
         blobTunnel = new BLOBUtilities.BLOBUploader({
             tunnel: tunnelAddressInput.value
-            ,chunkLength: chunkLenghtInput.value
+            ,chunkLength: chunkLengthInput.value
             ,maxTransfer: maxLengthInput.value
             ,file: file
         });
