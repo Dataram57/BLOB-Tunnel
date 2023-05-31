@@ -47,6 +47,7 @@ Tunnel Messages:
         --event2: when idle (optional)
         --event3: when earlier/internal restricions will be broken.
         --event4: when the client closes first
+        --event5: when config will break the tunnel's guidelines
 //----------------------------------------------------------------
     Upload(client):
         Input:
@@ -54,8 +55,8 @@ Tunnel Messages:
             event: next;
         Output:
             next;
-            --event: when the previous chunk of the file will be delivered, or if this is the first.
-            --event2: when the file info will be accepted by the initiator(Tunnel Agent).
+            --event: when the previous chunk of the file will be delivered
+            --event2: when the first chunk is demanded
         Close;
         --event: when idle.
         --event2: when the client will break the rule of not waiting for a permission to send.
@@ -74,11 +75,22 @@ Tunnel API:
 ================================================================
 Messaging Protocol for the tunnel agent.
 
-Agent API:
+Panel:
 
 /panel*
---Form: HTML / JS / CSS
+--Form: HTML / JS / CSS / Any...
 --Info: A content related to the user friendly magament manual panel
+
+Agent API:
+
+/info
+--Form: JSON
+--Info: A data about the tunnel (middle man)
+--Example:
+    {
+        address: STRING
+        useSSL: BOOLEAN
+    }
 
 /list
 --Form: JSON
@@ -136,7 +148,7 @@ Agent API:
             ,maxFileSize: INT //maximum size of the all summed chunks' lengths (used by the tunnel, to block the client from sending more than actually needs)
             ,chunkLenght: INT //length of a single chunk transfered by the client, through the tunnel
             //OPTIONAL ONLY:
-            ,overwrite: BOOLEAN //overwrite existing file, if necessary.
+            ,lock: BOOLEAN //lock file from being written by someone else
         }
 --Example:
     {

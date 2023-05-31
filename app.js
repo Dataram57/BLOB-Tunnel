@@ -113,8 +113,24 @@ const server = http.createServer((req, res) => {
             res.end('wrong key');
             break;
         case 'test':
+            //print download service
             let socket = downloadSessionChain.head;
             let i = 0;
+            res.write('Download count: ' + downloadSessionChain.length); 
+            while(socket){
+                res.write('\n'+i + '. ' + socket._key);
+                if(socket.chainBack)
+                    res.write(' Back: ' + socket.chainBack._key);
+                if(socket.chainFront)
+                    res.write(' Front: ' + socket.chainFront._key);
+                //next
+                i++;
+                socket = socket.chainFront;
+            }
+            //print upload service
+            socket = uploadSessionChain.head;
+            i = 0;
+            res.write("\nUpload count: " + uploadSessionChain.length); 
             while(socket){
                 res.write('\n'+i + '. ' + socket._key);
                 if(socket.chainBack)
@@ -206,7 +222,6 @@ const SetupDownloadSocket = (socket) => {
             //generate the key
             if(!socket._key){
                 const key = GenerateDownloadKey();
-                console.log(key);
                 socket._key = key;
                 socket.send("key;" + key);
                 //add to chain
@@ -216,7 +231,6 @@ const SetupDownloadSocket = (socket) => {
         else{
             //write tunneled data to the responese
             socket._client.write(message);
-            //console.log(message.toString());
             //shrink file size
             socket._fileLength -= message.length;
             //check remaining file size
@@ -280,7 +294,6 @@ const FindUploadSession = (key) => {
 };
 
 const SetupUploadServiceSocket = (socket) => {
-    console.log('Oh shitt!!!');
     //save session
     socket._key = null;
     //data count
@@ -288,7 +301,7 @@ const SetupUploadServiceSocket = (socket) => {
     socket._maxLength = -1;
     socket._chunkLength = 0;
     //client target
-    socket._client = null;
+    socket._client = null; //socket._client links to the upload source
     //checks
     socket._lastMessageDate = new Date();
     //Cache chain properties
@@ -297,7 +310,6 @@ const SetupUploadServiceSocket = (socket) => {
 
     //on message
     socket.on("message", msg => {
-        console.log(msg);
         //update socket last message date
         socket._lastMessageDate = new Date();
         //check status
@@ -305,15 +317,12 @@ const SetupUploadServiceSocket = (socket) => {
             //correct or apply setup/config
             //get setup
             const setup = JSON.parse(msg);
-            //check setup
-            console.log(setup);
             //set parameters
             socket._maxLength = setup.maxLength;
             socket._chunkLength = setup.chunkLength;
             //generate the key
             if(!socket._key){
                 const key = GenerateUploadKey();
-                console.log(key);
                 socket._key = key;
                 socket.send("key;" + key);
                 //add to chain
@@ -338,12 +347,12 @@ const SetupUploadServiceSocket = (socket) => {
                 //send command
                 socket._client.send('next;');
             }
+            //unknown command
         }
     });
 
     //on close
     socket.on("close", e => {
-        console.log(e);
         SafelyCloseUploadSession(socket);
     });
 
@@ -355,8 +364,7 @@ const SetupUploadServiceSocket = (socket) => {
 };
 
 const SetupUploadClientSocket = (socket) => {
-    //socket._target links to the upload destination
-    console.log(666666666666666);
+    //socket._client links to the upload destination
     //apply also this socket to the main session socket
     socket._client._client = socket;
     //give permission to send data
@@ -364,14 +372,12 @@ const SetupUploadClientSocket = (socket) => {
 
     //on message
     socket.on("message", message => {
-        console.log(message);
         //Substract the length
-        console.log(socket._length);
         socket._length -= message.length;
-        console.log(socket._length);
         //check permisionned length
         if(socket._length < 0){
-            console.log("FFUCIING HAKAR");
+            //close the whole session
+            SafelyCloseUploadSession(socket._client);
             return;
         }
         //block permission
@@ -383,7 +389,6 @@ const SetupUploadClientSocket = (socket) => {
 
     //on close
     socket.on("close", e => {
-        console.log(e);
         //close him and the destination
         socket._client.close();
         socket.close();
@@ -397,18 +402,21 @@ const SetupUploadClientSocket = (socket) => {
         socket._client.close();
         socket.close();
     });
+
+    //send message
+    socket.send('next;');
 };
 
 const SafelyCloseUploadSession = (session) => {
     //check if it was in the chain
     if(session._key)
-        downloadSessionChain.Remove(session);
+        uploadSessionChain.Remove(session);
     //close client
     if(session._client)
         session._client.close();
     //close itself
     session.close();
-}
+};
 
 //#endregion
 

@@ -19,7 +19,7 @@ const panelPrefix = '/panel/';
 const panelDirPath = __dirname + '/Panel/';
 //Tunnel
 const tunnelURL = 'localhost';
-const useSSL = false;
+const tunnelUseSSL = false;
 const openedTransferMaxCount = 30;
 //Download Service
 const downloadServiceSecretKey = 'zaq1"WSX';
@@ -67,7 +67,7 @@ const FileExists = (path) => {
 };
 
 const GetWebSocketURL = () => {
-    if(useSSL)
+    if(tunnelUseSSL)
         return 'wss:' + tunnelURL;
     return 'ws:' + tunnelURL; 
 };
@@ -125,6 +125,14 @@ app.get(apiPrefix, function (req, res) {
 //ping
 app.get(apiPrefix + 'ping', function (req, res) {
     res.end('pong');
+});
+ 
+//info
+app.get(apiPrefix + 'info', function (req, res) {
+    res.send({
+        address: tunnelURL
+        ,useSSL: tunnelUseSSL
+    });
 });
 
 //list
@@ -256,6 +264,27 @@ app.get(apiPrefix + 'startUpload/*', async function (req, res) {
     const result = await CreateUploadSession(config);
     //end
     res.send(result);
+});
+
+//killUpload/$key
+app.get(apiPrefix + 'killUpload/*', function (req, res) {
+    //check URL minimum
+    const args = req.url.split('/');
+    if(args.length <= apiPrefixSubCount){
+        //error
+        res.send(false);
+        return;
+    }
+    //read Key
+    //search for session
+    const socket = ScanChainForSessionKey(uploadSessionChain.head, args[apiPrefixSubCount]);
+    //check
+    if(socket === null)
+        res.send(false);
+    else{
+        CloseUploadSession(socket);
+        res.send(true);
+    }
 });
 
 //#endregion

@@ -1,9 +1,31 @@
 const apiURL = '/api/';
 const uploadTesterURL = 'upload-tester/';
-const tunnelAddress = 'localhost';
-const tunnelUseSSL = false;
+let tunnelAddress = 'localhost';
+let tunnelUseSSL = false;
 const tunnelUploadDir = '/upload/';
 const tunnelDownloadDir = '/download/';
+
+const LoadTunnelInfo = () => {
+    return new Promise(resolve => {
+        //call
+        FetchGet('info',(data) => {
+            try{
+                const info = JSON.parse(data);
+                //set
+                tunnelAddress = info.address;
+                tunnelUseSSL = info.useSSL;
+                //callback
+                resolve();
+            }
+            catch(e){
+                resolve({
+                    error: e
+                    ,data: data
+                });
+            }
+        });
+    });
+};
 
 const Log = (e) => console.log(e);
 
@@ -208,11 +230,19 @@ const PanelHostUpload = () => {
 //-var DownloadServiceRowsStart
 //-UploadServiceRows
 //-var UploadServiceRowsStart
-const InitPanel = () => {
+const InitPanel = async () => {
     //catch old innerHMTL
     DownloadServiceRowsStart = DownloadServiceRows.innerHTML;
     UploadServiceRowsStart = UploadServiceRows.innerHTML;
     //refresh
+    const result = await LoadTunnelInfo();
+    if(result){
+        document.write('There was a problem with setting up the tunnel info.<br>');
+        document.write(result.error);
+        document.write('<br>');
+        document.write(result.response);
+        return;
+    }
     PanelRefreshList();
     //add 
     InputFileInfo.addEventListener("change", () => {
