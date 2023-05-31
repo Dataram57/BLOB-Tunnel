@@ -49,10 +49,44 @@ const ClickStartUpload = () => {
             ,fileSize: file.size
         });
         //set events
-        //...
+        
+        //on progress
+        blobTunnel.onprogress = () => {
+            //calcs
+            const percent = blobTunnel.fileOffset / blobTunnel.fileSize * 100;
+            //change info
+            progress.innerHTML = percent.toFixed() + '% ( ' + blobTunnel.fileOffset + ' bytes )';
+            //change status bar
+            progressBar.style.width = percent.toString() + '%';
+        };
+
+        //on error
+        blobTunnel.onerror = (err) => {
+            //change color
+            progressBar.style.backgroundColor = 'red';
+            //result
+            console.log(err);
+            PrintResult('There was an error!');
+        };
+
+        //onfinish
+        blobTunnel.onfinish = () => {
+            //change info
+            progress.innerHTML = '100% ( ' + blobTunnel.fileOffset + ' bytes )';
+            //change status bar
+            progressBar.style.backgroundColor = 'lime';
+            progressBar.style.width = '100%';
+            //result
+            PrintResult('Upload was finished!');
+        };
+
         //start reading
         blobTunnel.Start();
     }
+};
+
+const PrintResult = (msg) => {
+    result.innerHTML = msg;
 };
 
 /*
@@ -76,7 +110,8 @@ function readChunk(blob) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(reader.error);
+        reader.onerr
+        or = () => reject(reader.error);
         reader.readAsArrayBuffer(blob);
     });
 }

@@ -19,25 +19,22 @@ const BLOBUtilities = {
             this.socket = null;
         }
 
+        //starts the upload proccess
+        //initiates the WS connection
         Start(){
-            console.log(this.tunnel);
             //create WS connection
             this.socket = new WebSocket(this.tunnel);
-            //setup events/behaviour
 
             //on open
             this.socket.addEventListener("open", e => {
                 //call event
                 this.onopen();
-                //send next chunk of data
-                this.SendNextChunk();
             });
 
             //on message
             this.socket.addEventListener("message", msg => {
                 //check command
                 const command = msg.data.toString().trim();
-                console.log(command);
                 if(command == 'next;'){
                     //wants next chunk of data
                     //call event
@@ -62,15 +59,21 @@ const BLOBUtilities = {
             });
         }
 
+        //closes the WS connection (if exists)
+        //deletes this object
         Close(){
-            console.log('closing...');
             //safely close connection
             if(this.socket)
                 this.socket.close();
             //call event
-            this.onfinish();
+            //check if was successful
+            if(blobTunnel.fileSize == blobTunnel.fileOffset)
+                this.onfinish();
+            else
+                this.onerror();
         }
 
+        //sends the next chunk of the file to the tunnel
         SendNextChunk(){
             this.ReadNextChunk((err, data) => {
                 if(err){
@@ -78,7 +81,6 @@ const BLOBUtilities = {
                     console.log(err);
                 }
                 else if(data){
-                    console.log(data);
                     //send next chunk of data
                     this.socket.send(data);
                 }
@@ -94,7 +96,6 @@ const BLOBUtilities = {
         ReadNextChunk(callback){
             //check if EOF
             if(this.fileOffset >= this.fileSize){
-                console.log(this.fileOffset, this.fileSize);
                 callback(null, null);
                 return;
             }

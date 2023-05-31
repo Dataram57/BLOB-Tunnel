@@ -235,6 +235,12 @@ app.get(apiPrefix + 'startUpload/*', async function (req, res) {
         res.send({error: 'Config is not in a right format.'});
         return;
     }
+    //check optional
+    if(config.lock)
+        if(typeof(config.lock) != 'boolean'){
+            res.send({error: 'Config is not in a right format.'});
+            return;
+        }
     //check numbers
     if(config.chunkLength <= 0){
         res.send({error: "$chunkLength can not be below or equal to 0."});
@@ -498,13 +504,11 @@ const SetupUploadSessionEvents = (socket) => {
             maxLength: socket._maxLength
             ,chunkLength: socket._chunkLength
         };
-        console.log(setup);
         socket.send(JSON.stringify(setup));
     });
 
     //on message
     socket.on("message", msg => {
-        console.log(msg);
         //ignore if closing
         if(socket._key === null)
             return;
@@ -530,25 +534,34 @@ const SetupUploadSessionEvents = (socket) => {
             //Tunnel sends only client's chunk
             //calculate left length
             const left = socket._maxLength - socket._length;
-            console.log(left);
             //check left size
-            //check if message size brokes the guidelines
+            if(left <= 0){
+                //The tunnel is sending more than it should. May be a hacker
+                CloseUploadSession(socket);
+                return;
+            }
+            //check if message size equals the remaining left space
             if(msg.length == Math.min(left, socket._chunkLength)){
                 //message has correct length, no need to trim
-                socket._fw.write(msg, 'binary');
+                //add length
                 socket._length += msg.length;
-                //check if EOF
-                if(socket._length >= socket._maxLength){
-                    //close
-                    CloseUploadSession(socket);
-                }
-                else{
-                    //request next chunk
-                    socket.send('next;');
-                }
+                //write to stream
+                socket._fw.write(msg, (err) => {
+                    //check if EOF
+                    if(socket._length >= socket._maxLength){
+                        //close
+                        CloseUploadSession(socket);
+                    }
+                    else{
+                        //request next chunk
+                        socket.send('next;');
+                    }
+                });
             }
             else{
-                console.log('message has wrong length');
+                //message has a diffrent size than it should
+                //break the connection and stop writing
+                CloseUploadSession(socket);
             }
         }
     });
@@ -623,7 +636,6 @@ const CreateUploadSession = (config) => {
                     resolve({error: 'Code ' + writeStream});
                     return;
                 }
-                console.log(typeof(writeStream));
                 //Assign writer behaviour
                 SetupUploadWriterEvents(writeStream);
                 //Create the WS connection
@@ -636,7 +648,6 @@ const CreateUploadSession = (config) => {
                 //file writing
                 socket._fw = writeStream;                   //File writer object
                 socket._chunkLength = config.chunkLength;   //Length of a single chunk
-                console.log(socket._chunkLength);
                 socket._maxLength = config.maxFileSize;     //Max length of the file
                 socket._length = -1;                        //current length of the written date ((< maxLength) means it needs. (= maxLength) means it has filled up all the data)
                 //state
