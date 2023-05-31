@@ -1,10 +1,5 @@
 /*================================================================
 This application is an agent / a tool to communicate with the public tunnel, in order to establish some connection between private servers and the outside client.
-It is possible to:
--Host a single file download tunnel.
-
-It is not yet possible to:
--Host an upload file tunnel. (+ locking the file)
 
 //================================================================*/
 //#region Config
@@ -18,8 +13,8 @@ const apiPrefixSubCount = apiPrefix.split('/').length;
 const panelPrefix = '/panel/';
 const panelDirPath = __dirname + '/Panel/';
 //Tunnel
-const tunnelURL = 'localhost';
-const tunnelUseSSL = false;
+const tunnelURL = 'backrooms.ethuardo.com';
+const tunnelUseSSL = true;
 const openedTransferMaxCount = 30;
 //Download Service
 const downloadServiceSecretKey = 'zaq1"WSX';

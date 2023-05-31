@@ -1,10 +1,5 @@
 /*================================================================
 This application is a tunnel between the private servers and the outside client.
-It is possible to:
--Create a download link, which would work as a tunnel between the private server and the outside client.
-
-It is not yet possible to:
--Create a WebSocket connection to transfer/upload outside client's file to a private server, through this service.
 
 //================================================================*/
 
@@ -174,15 +169,17 @@ if (typeof(PhusionPassenger) != 'undefined') {
 //================================================================
 //#region WS - Download service
 
-const downloadSessionCounter = 0;
+let downloadSessionCounter = 0;
 const downloadSessionChain = new ChainArray();
     //.length won't include sessions currently working(tunneling or setuping). Use downloadSessionCounter - downloadSessionChain.length to count busy
 const GenerateDownloadKey = () => GenerateKey(downloadSessionKeyLength);
+
 const CheckDownloadKey = (key) => {
     if(typeof(key) == 'string')
         return downloadSessionKeyLength == key.length;
     return false;
-}
+};
+
 const FindDownloadSession = (key) => {
     let socket = downloadSessionChain.head;
     while(socket)
@@ -194,6 +191,15 @@ const FindDownloadSession = (key) => {
 };
 
 const SetupDownloadSocket = (socket) => {
+    //check counter
+    if(downloadSessionCounter >= downloadSessionMaxCount){
+        //close session
+        socket.terminate();
+        return;
+    }
+    downloadSessionCounter++;
+    //hire self-checkout
+
     //save session
     socket._key = null;
     socket._fileLength = -1;
@@ -237,12 +243,14 @@ const SetupDownloadSocket = (socket) => {
             socket._fileLength -= message.length;
             //check remaining file size
             if(socket._fileLength <= 0){
-                console.log('finished writing data');
                 //end downloading
-                socket._client.end();
+                //socket._client.end();
                 //destroy ws
                 //socket was removed from the chain earlier
-                socket.terminate();
+                //socket.close();
+                //update stats
+                //downloadSessionCounter--;
+                CloseDownloadSession(socket);
             }
             //ask for next
             socket.send("next;");
@@ -250,25 +258,34 @@ const SetupDownloadSocket = (socket) => {
     });
 
     //on close
-    socket.on("close",e => {
-        //check if socket was in chain
-        if(socket._key)
-            downloadSessionChain.Remove(socket);
-        //destroy socket
-        socket.terminate();
+    socket.on("close", e => {
+        CloseDownloadSession(socket);
     });
 
     //on error
     socket.on('error', err => {
-        //check if it was in the chain
-        if(socket._key)
-            downloadSessionChain.Remove(socket);
-        //destroy socket
-        socket.terminate();
+        CloseDownloadSession(socket);
 
         //potential error codes(err.code):
         //WS_ERR_UNSUPPORTED_MESSAGE_LENGTH
     });        
+};
+
+//safely closes a download session
+const CloseDownloadSession = (session) => {
+    //check if it is listed
+    if(session._key)
+        downloadSessionChain.Remove(session);
+    //check if it has a client
+    if(session._client){
+        session._client.end();
+        //safely block respones
+        session._client = null;
+    }
+    //close
+    session.close();
+    //update stats
+    downloadSessionCounter--;
 };
 
 //#endregion
@@ -447,12 +464,6 @@ wsServer.on('connection', (socket, req) => {
         //it is important to not declare variables from this scope (due to cheaper/faster memory handling)
         if(req.headers['key'] === downloadServiceSecretKey){
             //client is the future source of file for download service
-            //check counter
-            if(downloadSessionCounter >= downloadSessionMaxCount){
-                //Too much of download session hanging
-                socket.close();
-                return;
-            }
             //setup download socket
             SetupDownloadSocket(socket);
         }else if(req.headers['key'] === uploadServiceSecretKey){
