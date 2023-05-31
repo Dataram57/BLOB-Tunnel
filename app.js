@@ -113,33 +113,35 @@ const server = http.createServer((req, res) => {
             res.end('wrong key');
             break;
         case 'test':
-            //print download service
-            let socket = downloadSessionChain.head;
-            let i = 0;
-            res.write('Download count: ' + downloadSessionChain.length); 
-            while(socket){
-                res.write('\n'+i + '. ' + socket._key);
-                if(socket.chainBack)
-                    res.write(' Back: ' + socket.chainBack._key);
-                if(socket.chainFront)
-                    res.write(' Front: ' + socket.chainFront._key);
-                //next
-                i++;
-                socket = socket.chainFront;
-            }
-            //print upload service
-            socket = uploadSessionChain.head;
-            i = 0;
-            res.write("\nUpload count: " + uploadSessionChain.length); 
-            while(socket){
-                res.write('\n'+i + '. ' + socket._key);
-                if(socket.chainBack)
-                    res.write(' Back: ' + socket.chainBack._key);
-                if(socket.chainFront)
-                    res.write(' Front: ' + socket.chainFront._key);
-                //next
-                i++;
-                socket = socket.chainFront;
+            if(false){
+                //print download service
+                let socket = downloadSessionChain.head;
+                let i = 0;
+                res.write('Download count: ' + downloadSessionChain.length); 
+                while(socket){
+                    res.write('\n'+i + '. ' + socket._key);
+                    if(socket.chainBack)
+                        res.write(' Back: ' + socket.chainBack._key);
+                    if(socket.chainFront)
+                        res.write(' Front: ' + socket.chainFront._key);
+                    //next
+                    i++;
+                    socket = socket.chainFront;
+                }
+                //print upload service
+                socket = uploadSessionChain.head;
+                i = 0;
+                res.write("\nUpload count: " + uploadSessionChain.length); 
+                while(socket){
+                    res.write('\n'+i + '. ' + socket._key);
+                    if(socket.chainBack)
+                        res.write(' Back: ' + socket.chainBack._key);
+                    if(socket.chainFront)
+                        res.write(' Front: ' + socket.chainFront._key);
+                    //next
+                    i++;
+                    socket = socket.chainFront;
+                }
             }
             res.end();
             break;
