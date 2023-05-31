@@ -208,6 +208,7 @@ const SetupDownloadSocket = (socket) => {
     socket._chunkLength = 0;
     socket._client = null;
     socket._lastMessageDate = new Date();
+    socket._isClosing = false;
     //Cache chain properties
     socket.chainBack = null;
     socket.chainFront = null;
@@ -273,9 +274,15 @@ const SetupDownloadSocket = (socket) => {
 
 //safely closes a download session
 const CloseDownloadSession = (session) => {
+    //mark is closing
+    if(session._isClosing)
+        return;
+    session._isClosing = true;
     //check if it is listed
-    if(session._key)
+    if(session._key){
         downloadSessionChain.Remove(session);
+        session._key = null;
+    }
     //check if it has a client
     if(session._client){
         session._client.end();

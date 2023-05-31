@@ -13,8 +13,8 @@ const apiPrefixSubCount = apiPrefix.split('/').length;
 const panelPrefix = '/panel/';
 const panelDirPath = __dirname + '/Panel/';
 //Tunnel
-const tunnelURL = 'backrooms.ethuardo.com';
-const tunnelUseSSL = true;
+const tunnelURL = 'localhost';
+const tunnelUseSSL = false;
 const openedTransferMaxCount = 30;
 //Download Service
 const downloadServiceSecretKey = 'zaq1"WSX';
@@ -101,6 +101,13 @@ const ReadJSONConfigFromURL = (url) => {
     }
     catch(e){
         return null;
+    }
+};
+
+const SessionCheckResolver = (session, returnValue) => {
+    if(session._resolver){
+        session._resolver(returnValue);
+        session._resolver = undefined;
     }
 };
 
@@ -397,10 +404,7 @@ const SetupDownloadSessionEvents = (socket) => {
             //key is not set yet or has changed
             socket._key = msg.subarray(4).toString();
             //call the callback
-            if(socket._resolver){
-                socket._resolver({key: socket._key});
-                socket._resolver = undefined;
-            }
+            SessionCheckResolver(socket, {key: socket._key});
         }
         //next
         else if(msg.subarray(0,5).toString() == 'next;'){
@@ -424,6 +428,8 @@ const SetupDownloadSessionEvents = (socket) => {
     //on close
     socket.on("close", e => {
         console.log(e);
+        //check if it had a resolver
+        SessionCheckResolver(socket, {error: "Couldn't get the key of the download session."});
         //recognize the state
         //...
         if(socket._offset < socket._length){
@@ -438,6 +444,8 @@ const SetupDownloadSessionEvents = (socket) => {
     //on error
     socket.on("error", err => {
         console.log(err);
+        //check if it had a resolver
+        SessionCheckResolver(socket, {error: "Couldn't get the key of the download session."});
         //recognize the state
         //...
         if(socket._offset < socket._length){
@@ -466,6 +474,7 @@ const CloseDownloadSession = (socket) => {
         downloadSessionChain.Remove(socket);
         //close WebSocket
         socket.close();
+        //check if it had a resolver
     });
 };
 
