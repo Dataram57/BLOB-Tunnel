@@ -11,7 +11,10 @@ const wsMaxPayLoad = 1024;
 //Download Service
 const downloadServiceSecretKey = 'zaq1"WSX';
 const downloadSessionKeyLength = 16;
-const downloadSessionMaxCount = 16;
+const downloadSessionMaxCount = 8;
+const donwloadSessionMaxChunkLength = 2048;
+const donwloadSessionMinChunkLength = 128;
+const downloadSessionMaxFileSize = 9999999999999;
 //Upload Service
 const uploadServiceSecretKey = 'ZAQ!2wsx';
 const uploadSessionKeyLength = 16;
@@ -68,6 +71,15 @@ const GenerateKey = (length) => {
     return key;
 };
 
+const ReadJSONFromBuffer = (buffer) => {
+    try{
+        return JSON.parse(buffer);
+    }
+    catch(e){
+        return null;
+    }
+};
+
 //#endregion
 
 //================================================================
@@ -89,18 +101,25 @@ const server = http.createServer((req, res) => {
             if(CheckDownloadKey(params[2])){
                 //search for the corresponding socket
                 const key = params[2];
-                let socket = FindDownloadSession(key);
+                const socket = FindDownloadSession(key);
                 //check searching result
                 if(socket){
-                    //Remove socket from the chain
-                    downloadSessionChain.Remove(socket);
                     //write headers
                     res.setHeader('Content-Type', GetMIME(socket._fileName.substr(socket._fileName.lastIndexOf('.') + 1)));
                     res.setHeader('Content-Disposition', `attachment; filename="${socket._fileName}"`);
                     res.setHeader('Content-Length', socket._fileLength);
-                    //begin responding;
+                    //attach 
                     socket._client = res;
-                    socket.send('next;');
+                    //begin responding;
+                    if(socket._fileLength <= 0)
+                        //close whole connection and return the empty file
+                        CloseDownloadSession(socket);
+                    else{
+                        //Remove socket from the chain
+                        DelistDownloadSession(socket);
+                        //request next chunk
+                        socket.send('next;');
+                    }
                     return;
                 }
             }
@@ -221,9 +240,23 @@ const SetupDownloadSocket = (socket) => {
         if(!socket._client){
             //correct or apply setup/config
             //get setup
-            const setup = JSON.parse(message);
+            const setup = ReadJSONFromBuffer(message);
             //check setup
-            console.log(setup);
+            if(!setup){
+                CloseDownloadSession(socket);
+                return;
+            }
+            //check parameters
+            if(typeof(setup.fileName) != 'string' || typeof(setup.fileSize) != 'number' || typeof(setup.chunkLength) != 'number'){
+                CloseDownloadSession(socket);
+                return;
+            }
+            //check parameters values
+            setup.fileSize = parseInt(setup.fileSize);
+            if(setup.fileName.trim().length <= 0 || (setup.fileSize < 0 || setup.fileSize > downloadSessionMaxFileSize) || (setup.chunkLength > donwloadSessionMaxChunkLength || setup.chunkLength < donwloadSessionMinChunkLength)){
+                CloseDownloadSession(socket);
+                return;
+            }
             //set parameters
             socket._fileName = setup.fileName;
             socket._fileLength = setup.fileSize;
@@ -279,10 +312,7 @@ const CloseDownloadSession = (session) => {
         return;
     session._isClosing = true;
     //check if it is listed
-    if(session._key){
-        downloadSessionChain.Remove(session);
-        session._key = null;
-    }
+    DelistDownloadSession(session);
     //check if it has a client
     if(session._client){
         session._client.end();
@@ -293,6 +323,14 @@ const CloseDownloadSession = (session) => {
     session.close();
     //update stats
     downloadSessionCounter--;
+};
+
+//safely delists a download session
+const DelistDownloadSession = (session) => {
+    if(session._key){
+        downloadSessionChain.Remove(session);
+        session._key = null;
+    }
 };
 
 //#endregion
