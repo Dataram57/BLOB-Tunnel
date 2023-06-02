@@ -464,8 +464,10 @@ const CloseDownloadSession = (socket) => {
     if(socket._key === null)
         return;
     //mark as it is being closed
-    console.log('Closing download session:',KeyToString(socket._key));
+    //console.log('Closing download session:',KeyToString(socket._key));
     socket._key = null;
+    //remove events
+    socket.removeAllListeners();
     //close file stream
     socket._fr.close((err) => {
         if(err)
@@ -490,6 +492,9 @@ const uploadSessionChain = new ChainArray();
 const CreateWriteStream = (filePath, lockFile) => {
     return new Promise(resolve => {
         if(lockFile){
+            //check if the file is locked
+
+            //try to create a native connection
             fs.open(filePath, 'w', (err, fd) => {
                 if(err){
                     resolve(err.code);
@@ -511,7 +516,7 @@ const CreateWriteStream = (filePath, lockFile) => {
 
 //Assigns upload writer behaviour to the given File writer
 const SetupUploadWriterEvents = (writer) => {
-    //on open
+    //on open (not working)
     writer.on('open', () => {
         console.log('opened');
     });
@@ -520,9 +525,10 @@ const SetupUploadWriterEvents = (writer) => {
     writer.on('error', (err) => {
         console.error('Error writing file:', err);
         CloseUploadSession(writer._socket);
+        Boss;
     });
 
-    //on finish
+    //on finish or on close
     writer.on('finish', () => {
         console.log('Binary data written to output.bin');
     });
@@ -554,10 +560,7 @@ const SetupUploadSessionEvents = (socket) => {
                 //key is not set yet or has changed
                 socket._key = msg.subarray(4).toString();
                 //call the callback
-                if(socket._resolver){
-                    socket._resolver({key: socket._key});
-                    socket._resolver = undefined;
-                }
+                SessionCheckResolver(socket, {key: socket._key});
                 //listen for chunks
                 socket._length = 0;
             }
@@ -573,8 +576,8 @@ const SetupUploadSessionEvents = (socket) => {
                 CloseUploadSession(socket);
                 return;
             }
-            //check if message size equals the remaining left space
-            if(msg.length == Math.min(left, socket._chunkLength)){
+            //check if message size equals or is lower than the remaining left space to fill
+            if(msg.length <= Math.min(left, socket._chunkLength)){
                 //message has correct length, no need to trim
                 //add length
                 socket._length += msg.length;
@@ -606,6 +609,8 @@ const SetupUploadSessionEvents = (socket) => {
         //...
         if(socket._length < 0){
             //The transfer was not even started yet.
+            //check if it had a resolver
+            SessionCheckResolver(socket, {error: "Couldn't get the key of the upload session."});
             //Close session
             CloseUploadSession(socket);
             //Call the boss
@@ -634,6 +639,8 @@ const SetupUploadSessionEvents = (socket) => {
         //...
         if(socket._length < 0){
             //The transfer was not even started yet.
+            //check if it had a resolver
+            SessionCheckResolver(socket, {error: "Couldn't get the key of the upload session."});
             //Close session
             CloseUploadSession(socket);
             //Call the boss
@@ -704,6 +711,8 @@ const CloseUploadSession = (socket) => {
         return;
     //mark as it is being closed
     socket._key = null;
+    //remove events
+    socket.removeAllListeners();
     //close writer
     socket._fw.close((err) => {
         if(err)

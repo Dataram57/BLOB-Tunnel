@@ -7,7 +7,7 @@ This application is a tunnel between the private servers and the outside client.
 const serverPort = 80;
 //WS server
 const wsPort = serverPort;
-const wsMaxPayLoad = 1024;
+const wsMaxPayLoad = 2048;
 //Download Service
 const downloadServiceSecretKey = 'zaq1"WSX';
 const downloadSessionKeyLength = 16;
@@ -18,12 +18,17 @@ const downloadSessionMaxFileSize = 9999999999999;
 //Upload Service
 const uploadServiceSecretKey = 'ZAQ!2wsx';
 const uploadSessionKeyLength = 16;
-const uploadSessionMaxCount = 16;
+const uploadSessionMaxCount = 4;
+const uploadSessionMaxChunkLength = 2048;
+const uploadSessionMinChunkLength = 128;
+const uploadSessionMaxFileSize = 9999999999999;
 //WS server delay checks
 //obsolete cause they should rely on the admin's side
 //WS client delay/error checks
 const maxClientDelayInMessage = 10 * 1000; 
 //client has strict rules, and should only message once whenever the tunnel message him.
+
+//Idle check should rely on 1 Timeout event for the whole chain
 
 //#endregion
 
@@ -209,6 +214,21 @@ const FindDownloadSession = (key) => {
     return null;
 };
 
+const VerifyDownloadSetup = (setup) => {
+    //check setup
+    if(!setup)
+        return;
+    //check parameters
+    if(typeof(setup.fileName) != 'string' || typeof(setup.fileSize) != 'number' || typeof(setup.chunkLength) != 'number')
+        return;
+    //check parameters values
+    setup.fileSize = parseInt(setup.fileSize);
+    if(setup.fileName.trim().length <= 0 || (setup.fileSize < 0 || setup.fileSize > downloadSessionMaxFileSize) || (setup.chunkLength > donwloadSessionMaxChunkLength || setup.chunkLength < donwloadSessionMinChunkLength))
+        return;
+    //return correct setup
+    return setup;
+};
+
 const SetupDownloadSocket = (socket) => {
     //check counter
     if(downloadSessionCounter >= downloadSessionMaxCount){
@@ -240,20 +260,9 @@ const SetupDownloadSocket = (socket) => {
         if(!socket._client){
             //correct or apply setup/config
             //get setup
-            const setup = ReadJSONFromBuffer(message);
+            const setup = VerifyDownloadSetup(ReadJSONFromBuffer(message));
             //check setup
             if(!setup){
-                CloseDownloadSession(socket);
-                return;
-            }
-            //check parameters
-            if(typeof(setup.fileName) != 'string' || typeof(setup.fileSize) != 'number' || typeof(setup.chunkLength) != 'number'){
-                CloseDownloadSession(socket);
-                return;
-            }
-            //check parameters values
-            setup.fileSize = parseInt(setup.fileSize);
-            if(setup.fileName.trim().length <= 0 || (setup.fileSize < 0 || setup.fileSize > downloadSessionMaxFileSize) || (setup.chunkLength > donwloadSessionMaxChunkLength || setup.chunkLength < donwloadSessionMinChunkLength)){
                 CloseDownloadSession(socket);
                 return;
             }
@@ -320,6 +329,7 @@ const CloseDownloadSession = (session) => {
         session._client = null;
     }
     //close
+    session.removeAllListeners();
     session.close();
     //update stats
     downloadSessionCounter--;
@@ -341,9 +351,9 @@ const DelistDownloadSession = (session) => {
 //A is the outside client. (requires Invite key)
 //B is the actual service. (requires Secret Upload service kay).
 
-const uploadSessionCounter = 0;
+let uploadSessionCounter = 0;
 const uploadSessionChain = new ChainArray();
-    //.length won't include sessions currently working(tunneling or setuping). Use uploadSessionCounter - uploadSessionChain.length to count busy
+    //.length won't include sessions currently working(tunneling). Use uploadSessionCounter - uploadSessionChain.length to count the working ones
 
 const GenerateUploadKey = () => GenerateKey(uploadSessionKeyLength);
 
@@ -357,9 +367,35 @@ const FindUploadSession = (key) => {
     return null;
 };
 
+const VerifyUploadSetup = (setup) => {
+    //check setup
+    if(!setup)
+        return;
+    //check parameters
+    if(typeof(setup.maxLength) != 'number' || typeof(setup.chunkLength) != 'number')
+        return;
+    //check values
+    setup.maxLength = parseInt(setup.maxLength);
+    setup.chunkLength = parseInt(setup.chunkLength);
+    if((setup.maxLength <= 0 || setup.maxLength > uploadSessionMaxFileSize) || (setup.chunkLength > uploadSessionMaxChunkLength || setup.chunkLength < uploadSessionMinChunkLength))
+        return;
+    //return setup
+    return setup;
+};
+
 const SetupUploadServiceSocket = (socket) => {
+    //check counter
+    if(uploadSessionCounter >= uploadSessionMaxCount){
+        //close session
+        socket.terminate();
+        return;
+    }
+    uploadSessionCounter++;
+    //hire self-checkout
+    
     //save session
     socket._key = null;
+    socket._isClosing = false;
     //data count
     socket._length = 0;
     socket._maxLength = -1;
@@ -380,7 +416,12 @@ const SetupUploadServiceSocket = (socket) => {
         if(!socket._client){
             //correct or apply setup/config
             //get setup
-            const setup = JSON.parse(msg);
+            const setup = VerifyUploadSetup(ReadJSONFromBuffer(msg));
+            //check setup
+            if(!setup){
+                CloseUploadSession(socket);
+                return;
+            }
             //set parameters
             socket._maxLength = setup.maxLength;
             socket._chunkLength = setup.chunkLength;
@@ -402,8 +443,8 @@ const SetupUploadServiceSocket = (socket) => {
                 //check if EOF
                 if(socket._length >= socket._maxLength){
                     //close all connections
-                    socket._client.close();
-                    socket.close();
+                    //This is also an information that the app_agent seeked for more.
+                    CloseUploadSession(socket);
                     return;
                 }
                 //allow client to send the next chunk of file
@@ -417,13 +458,13 @@ const SetupUploadServiceSocket = (socket) => {
 
     //on close
     socket.on("close", e => {
-        SafelyCloseUploadSession(socket);
+        CloseUploadSession(socket);
     });
 
     //on error
     socket.on('error', err => {
         console.log(err);
-        SafelyCloseUploadSession(socket);
+        CloseUploadSession(socket);
     });
 };
 
@@ -441,8 +482,13 @@ const SetupUploadClientSocket = (socket) => {
         //check permisionned length
         if(socket._length < 0){
             //close the whole session
-            SafelyCloseUploadSession(socket._client);
+            CloseUploadSession(socket._client);
             return;
+        }
+        else if(socket._length > 0){
+            //means that this chunk was the last one
+            //set the remaining left trasfer data amount to the possible max
+            socket._client._length = socket._client._maxLength;
         }
         //block permission
         socket._length = 0;
@@ -454,8 +500,7 @@ const SetupUploadClientSocket = (socket) => {
     //on close
     socket.on("close", e => {
         //close him and the destination
-        socket._client.close();
-        socket.close();
+        CloseUploadSession(socket._client);
     });
 
     //on error
@@ -463,23 +508,39 @@ const SetupUploadClientSocket = (socket) => {
         //.code = WS_ERR_UNSUPPORTED_MESSAGE_LENGTH
         console.log(err);
         //close him and the destination
-        socket._client.close();
-        socket.close();
+        CloseUploadSession(socket._client);
     });
 
     //send message
     socket.send('next;');
 };
 
-const SafelyCloseUploadSession = (session) => {
-    //check if it was in the chain
-    if(session._key)
-        uploadSessionChain.Remove(session);
+//safely closes an upload session and its potential client session
+const CloseUploadSession = (session) => {
+    //mark is closing
+    if(session._isClosing)
+        return;
+    session._isClosing = true;
+    //check if it is listed
+    DelistUploadSession(session);
     //close client
-    if(session._client)
+    if(session._client){
+        session._client.removeAllListeners();
         session._client.close();
+    }
     //close itself
+    session.removeAllListeners();
     session.close();
+    //update stats
+    uploadSessionCounter--;
+};
+
+//safely delists an upload session
+const DelistUploadSession = (session) => {
+    if(session._key){
+        uploadSessionChain.Remove(session);
+        session._key = null;
+    }
 };
 
 //#endregion
@@ -534,8 +595,7 @@ wsServer.on('connection', (socket, req) => {
                 socket._client = FindUploadSession(target);
                 if(socket._client){
                     //delist session
-                    uploadSessionChain.Remove(socket._client);
-                    socket._client._key = null;
+                    DelistUploadSession(socket._client);
                     //Setup the socket
                     SetupUploadClientSocket(socket);
                     return;
