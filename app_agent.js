@@ -529,9 +529,9 @@ const SetupUploadWriterEvents = (writer) => {
     });
 
     //on finish or on close
-    writer.on('finish', () => {
-        console.log('Binary data written to output.bin');
-    });
+    //writer.on('finish', () => {
+    //    console.log('Binary data written to output.bin');
+    //});
 };
 
 //Assigns upload behaviour to the given WebSocket connection
@@ -604,7 +604,7 @@ const SetupUploadSessionEvents = (socket) => {
 
     //on close
     socket.on("close", e => {
-        console.log(e);
+        //console.log(e);
         //recognize the state
         //...
         if(socket._length < 0){
