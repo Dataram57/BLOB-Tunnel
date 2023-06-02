@@ -51,8 +51,14 @@ class ChainArray {
                 //(skip reading old pointer's data)
                 this.head.chainBack = null;
             }else
-                //obj is the head and the last, meaning that the count is equal to 1
-                this.head = null;
+                //sussy case, check if he is the head
+                if(this.head == obj)
+                    //obj is the head and the last, meaning that the count is equal to 1
+                    this.head = null;
+                else
+                    //obj is not in the array
+                    //do nothing
+                    return this.length;
         }
         //return length
         return --this.length;
