@@ -12,9 +12,14 @@ const wsMaxPayLoad = 2048;
 const downloadServiceSecretKey = 'zaq1"WSX';
 const downloadSessionKeyLength = 16;
 const downloadSessionMaxCount = 8;
-const donwloadSessionMaxChunkLength = 2048;
-const donwloadSessionMinChunkLength = 128;
+const downloadSessionMaxChunkLength = 2048;
+const downloadSessionMinChunkLength = 128;
 const downloadSessionMaxFileSize = 9999999999999;
+//idle check
+const downloadSessionMinExpireTime = 60 * 1000;
+const downloadSessionExpireCheckTime = 20 * 1000;
+const downloadSessionIdleMinTime = 10 * 1000;
+const downloadSessionIdleCheckTime = 1 * 1000;
 //Upload Service
 const uploadServiceSecretKey = 'ZAQ!2wsx';
 const uploadSessionKeyLength = 16;
@@ -22,6 +27,11 @@ const uploadSessionMaxCount = 4;
 const uploadSessionMaxChunkLength = 2048;
 const uploadSessionMinChunkLength = 128;
 const uploadSessionMaxFileSize = 9999999999999;
+//idle check
+const uploadSessionMinExpireTime = 60 * 1000;
+const uploadSessionExpireCheckTime = 20 * 1000;
+const uploadSessionIdleMinTime = 10 * 1000;
+const uploadSessionIdleCheckTime = 5 * 1000;
 //WS server delay checks
 //obsolete cause they should rely on the admin's side
 //WS client delay/error checks
@@ -60,12 +70,12 @@ const ExtMIME = {
     "txt": "text/plain",
     "json": "application/json",
     "xml": "application/xml"
-}
+};
 const GetMIME = (ext) => {
     if(ExtMIME[ext])
         return ExtMIME[ext];
     return "text/plain";
-}
+};
 
 const GenerateKey = (length) => {
     //declare var
@@ -84,6 +94,8 @@ const ReadJSONFromBuffer = (buffer) => {
         return null;
     }
 };
+
+const UpdateLastActionDate = (socket) => socket._lastActionDate = new Date();
 
 //#endregion
 
@@ -120,8 +132,14 @@ const server = http.createServer((req, res) => {
                         //close whole connection and return the empty file
                         CloseDownloadSession(socket);
                     else{
+
+                        //METHOD 2: CHAIN SWAP (REMOVE FROM THE OLD CHAIN => MOVE TO THE NEW CHAIN)
                         //Remove socket from the chain
                         DelistDownloadSession(socket);
+                        //register Action date
+                        UpdateLastActionDate(socket);
+                        //track idleness of the session
+                        downloadSessionBusyChain.Add(socket);
                         //request next chunk
                         socket.send('next;');
                     }
@@ -195,7 +213,35 @@ if (typeof(PhusionPassenger) != 'undefined') {
 
 let downloadSessionCounter = 0;
 const downloadSessionChain = new ChainArray();
+
     //.length won't include sessions currently working(tunneling or setuping). Use downloadSessionCounter - downloadSessionChain.length to count busy
+
+//this chain is used for tracking idleness
+const downloadSessionBusyChain = new ChainArray();
+    // < 0 means that the timeout is not running
+const DownloadSessionIdleCheck = () => {
+    console.log('check (Count: ' + downloadSessionBusyChain.length + ' ' + downloadSessionChain.length + ' ) ' + new Date().toLocaleString());
+    //scan
+    const current = new Date();
+    let session = downloadSessionBusyChain.head;
+    let sessionNext = null;
+    while(session){
+        //get the next next session
+        sessionNext = session.chainFront;
+        //check last message date
+        if(current - session._lastActionDate > downloadSessionIdleMinTime){
+            console.log(current - session._lastActionDate);
+            //close this session
+            CloseDownloadSession(session);
+        }
+        //next
+        session = sessionNext;
+    }
+};
+setInterval(DownloadSessionIdleCheck, downloadSessionIdleCheckTime);
+
+
+
 const GenerateDownloadKey = () => GenerateKey(downloadSessionKeyLength);
 
 const CheckDownloadKey = (key) => {
@@ -223,7 +269,7 @@ const VerifyDownloadSetup = (setup) => {
         return;
     //check parameters values
     setup.fileSize = parseInt(setup.fileSize);
-    if(setup.fileName.trim().length <= 0 || (setup.fileSize < 0 || setup.fileSize > downloadSessionMaxFileSize) || (setup.chunkLength > donwloadSessionMaxChunkLength || setup.chunkLength < donwloadSessionMinChunkLength))
+    if(setup.fileName.trim().length <= 0 || (setup.fileSize < 0 || setup.fileSize > downloadSessionMaxFileSize) || (setup.chunkLength > downloadSessionMaxChunkLength || setup.chunkLength < downloadSessionMinChunkLength))
         return;
     //return correct setup
     return setup;
@@ -237,8 +283,6 @@ const SetupDownloadSocket = (socket) => {
         return;
     }
     downloadSessionCounter++;
-    //hire self-checkout
-
     //save session
     socket._key = null;
     socket._fileLength = -1;
@@ -246,16 +290,17 @@ const SetupDownloadSocket = (socket) => {
     //usage ._chunkLength is mixed with setTimout returned id
     socket._chunkLength = 0;
     socket._client = null;
-    socket._lastMessageDate = new Date();
+    socket._lastActionDate = new Date();
     socket._isClosing = false;
     //Cache chain properties
     socket.chainBack = null;
     socket.chainFront = null;
+    //add to track potential idles
+    //METHOD 1: FIRST CHAIN (FIRST CHAIN ASSIGN)
+    downloadSessionBusyChain.Add(socket);
 
     //on message
     socket.on("message", message => {
-        //update socket last message date
-        socket._lastMessageDate = new Date();
         //check status
         if(!socket._client){
             //correct or apply setup/config
@@ -273,13 +318,21 @@ const SetupDownloadSocket = (socket) => {
             //generate the key
             if(!socket._key){
                 const key = GenerateDownloadKey();
+                console.log(key);
                 socket._key = key;
                 socket.send("key;" + key);
-                //add to chain
+                //register Action date
+                UpdateLastActionDate(socket);
+                //add to chain of listed and remove session from the idle tracker
+                //remove session from the idle tracker
+                //METHOD 2: CHAIN SWAP (REMOVE FROM THE OLD CHAIN => MOVE TO THE NEW CHAIN)
+                downloadSessionBusyChain.Remove(socket);
                 downloadSessionChain.Add(socket);
             }
         }
         else{
+            //register Action date
+            UpdateLastActionDate(socket);
             //write tunneled data to the responese
             socket._client.write(message);
             //shrink file size
@@ -321,7 +374,12 @@ const CloseDownloadSession = (session) => {
         return;
     session._isClosing = true;
     //check if it is listed
+    //METHOD 3: NO CHAIN (SAFELY REMOVE FROM ALL CHAINS)
     DelistDownloadSession(session);
+    //try to remove from the idle tracker
+    if(!session._key){
+        downloadSessionBusyChain.Remove(session);
+    }
     //check if it has a client
     if(session._client){
         session._client.end();
@@ -402,16 +460,12 @@ const SetupUploadServiceSocket = (socket) => {
     socket._chunkLength = 0;
     //client target
     socket._client = null; //socket._client links to the upload source
-    //checks
-    socket._lastMessageDate = new Date();
     //Cache chain properties
     socket.chainBack = null;
     socket.chainFront = null;
 
     //on message
     socket.on("message", msg => {
-        //update socket last message date
-        socket._lastMessageDate = new Date();
         //check status
         if(!socket._client){
             //correct or apply setup/config
