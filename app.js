@@ -16,7 +16,7 @@ const downloadSessionMaxChunkLength = 2048;
 const downloadSessionMinChunkLength = 128;
 const downloadSessionMaxFileSize = 9999999999999;
 //idle check
-const downloadSessionMinExpireTime = 60 * 1000;
+const downloadSessionExpireMinTime = 15 * 1000;
 const downloadSessionExpireCheckTime = 20 * 1000;
 const downloadSessionIdleMinTime = 10 * 1000;
 const downloadSessionIdleCheckTime = 1 * 1000;
@@ -28,7 +28,7 @@ const uploadSessionMaxChunkLength = 2048;
 const uploadSessionMinChunkLength = 128;
 const uploadSessionMaxFileSize = 9999999999999;
 //idle check
-const uploadSessionMinExpireTime = 60 * 1000;
+const uploadSessionExpireMinTime = 60 * 1000;
 const uploadSessionExpireCheckTime = 20 * 1000;
 const uploadSessionIdleMinTime = 10 * 1000;
 const uploadSessionIdleCheckTime = 5 * 1000;
@@ -213,36 +213,59 @@ if (typeof(PhusionPassenger) != 'undefined') {
 
 let downloadSessionCounter = 0;
 const downloadSessionChain = new ChainArray();
-
     //.length won't include sessions currently working(tunneling or setuping). Use downloadSessionCounter - downloadSessionChain.length to count busy
+
+const DownloadSessionCheckDeadInChain = (chainHead, minTime) => {
+    const current = new Date();
+    let sessionNext = null;
+    while(chainHead){
+        //get the next next session
+        sessionNext = chainHead.chainFront;
+        //check last message date
+        if(current - chainHead._lastActionDate > minTime)
+            //close this session
+            CloseDownloadSession(chainHead);
+        //next
+        chainHead = sessionNext;
+    }
+};
+
+const DownloadSessionListedCheck = () => {
+    console.log('Download Expired Check (Count: ' + downloadSessionChain.length + ') ' + new Date().toLocaleString());
+    //scan
+    DownloadSessionCheckDeadInChain(downloadSessionChain.head, downloadSessionExpireMinTime);
+};
+//launch checker
+setInterval(DownloadSessionListedCheck, downloadSessionExpireCheckTime);
 
 //this chain is used for tracking idleness
 const downloadSessionBusyChain = new ChainArray();
-    // < 0 means that the timeout is not running
 const DownloadSessionIdleCheck = () => {
-    console.log('check (Count: ' + downloadSessionBusyChain.length + ' ' + downloadSessionChain.length + ' ) ' + new Date().toLocaleString());
+    console.log('Download Idle Check (Count: ' + downloadSessionBusyChain.length + ') ' + new Date().toLocaleString());
     //scan
-    const current = new Date();
-    let session = downloadSessionBusyChain.head;
-    let sessionNext = null;
-    while(session){
-        //get the next next session
-        sessionNext = session.chainFront;
-        //check last message date
-        if(current - session._lastActionDate > downloadSessionIdleMinTime){
-            console.log(current - session._lastActionDate);
-            //close this session
-            CloseDownloadSession(session);
-        }
-        //next
-        session = sessionNext;
-    }
+    DownloadSessionCheckDeadInChain(downloadSessionBusyChain.head, downloadSessionIdleMinTime);
 };
+//launch checker
 setInterval(DownloadSessionIdleCheck, downloadSessionIdleCheckTime);
 
-
-
-const GenerateDownloadKey = () => GenerateKey(downloadSessionKeyLength);
+const GenerateDownloadKey = () => {
+    //generates a key that no listed session will have
+    let key = '';
+    let session = null;
+    do{
+        //generate
+        key = GenerateKey(downloadSessionKeyLength);
+        //search
+        session = downloadSessionChain.head;
+        while(session)
+            if(session._key == key)
+                break;
+            else
+                session = session.chainFront;
+    }while(session)
+    //key is unique
+    return key;
+};
 
 const CheckDownloadKey = (key) => {
     if(typeof(key) == 'string')
@@ -375,11 +398,11 @@ const CloseDownloadSession = (session) => {
     session._isClosing = true;
     //check if it is listed
     //METHOD 3: NO CHAIN (SAFELY REMOVE FROM ALL CHAINS)
-    DelistDownloadSession(session);
     //try to remove from the idle tracker
-    if(!session._key){
+    if(!session._key)
         downloadSessionBusyChain.Remove(session);
-    }
+    else
+        DelistDownloadSession(session);
     //check if it has a client
     if(session._client){
         session._client.end();
