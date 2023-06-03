@@ -4,6 +4,12 @@
 //.chainBack - reference to last neighbour element
 //element is not wrapped into another object (danger for parameters collision)
 //element is not checked if it is a null (danger for counting)(should alwyas be removed from the chain, before becoming a null)
+
+//Methods of switching chains:
+//METHOD 1: FIRST CHAIN (FIRST CHAIN ASSIGN)
+//METHOD 2: CHAIN SWAP (REMOVE FROM THE OLD CHAIN => MOVE TO THE NEW CHAIN)
+//METHOD 3: NO CHAIN (SAFELY REMOVE FROM ALL CHAINS)
+
 class ChainArray {
     constructor(){
         this.head = null;
@@ -52,13 +58,13 @@ class ChainArray {
                 this.head.chainBack = null;
             }else
                 //sussy case, check if he is the head
-                if(this.head == obj)
-                    //obj is the head and the last, meaning that the count is equal to 1
-                    this.head = null;
-                else
+                //if(this.head == obj)
+                //obj is the head and the last, meaning that the count is equal to 1
+                this.head = null;
+                //else
                     //obj is not in the array
                     //do nothing
-                    return this.length;
+                    //return this.length;
         }
         //return length
         return --this.length;
