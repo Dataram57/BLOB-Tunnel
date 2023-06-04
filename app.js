@@ -28,10 +28,11 @@ const uploadSessionMaxChunkLength = 2048;
 const uploadSessionMinChunkLength = 128;
 const uploadSessionMaxFileSize = 9999999999999;
 //idle check
-const uploadSessionExpireMinTime = 60 * 1000;
-const uploadSessionExpireCheckTime = 20 * 1000;
-const uploadSessionIdleMinTime = 10 * 1000;
-const uploadSessionIdleCheckTime = 5 * 1000;
+const uploadSessionExpireMinTime = 15 * 1000;
+const uploadSessionExpireCheckTime = 2 * 1000;
+const uploadSessionIdleDestinationMinTime = 10 * 1000;
+const uploadSessionIdleClientMinTime = 10 * 1000;
+const uploadSessionIdleCheckTime = 1 * 1000;
 //WS server delay checks
 //obsolete cause they should rely on the admin's side
 //WS client delay/error checks
@@ -96,6 +97,21 @@ const ReadJSONFromBuffer = (buffer) => {
 };
 
 const UpdateLastActionDate = (socket) => socket._lastActionDate = new Date();
+
+const CheckExpiredSessionInChain = (chainHead, minTime, funcClose) => {
+    const current = new Date();
+    let sessionNext = null;
+    while(chainHead){
+        //get the next next session
+        sessionNext = chainHead.chainFront;
+        //check last message date
+        if(current - chainHead._lastActionDate > minTime)
+            //close this session
+            funcClose(chainHead);
+        //next
+        chainHead = sessionNext;
+    }
+};
 
 //#endregion
 
@@ -213,27 +229,12 @@ if (typeof(PhusionPassenger) != 'undefined') {
 
 let downloadSessionCounter = 0;
 const downloadSessionChain = new ChainArray();
-    //.length won't include sessions currently working(tunneling or setuping). Use downloadSessionCounter - downloadSessionChain.length to count busy
-
-const DownloadSessionCheckDeadInChain = (chainHead, minTime) => {
-    const current = new Date();
-    let sessionNext = null;
-    while(chainHead){
-        //get the next next session
-        sessionNext = chainHead.chainFront;
-        //check last message date
-        if(current - chainHead._lastActionDate > minTime)
-            //close this session
-            CloseDownloadSession(chainHead);
-        //next
-        chainHead = sessionNext;
-    }
-};
+//.length won't include sessions currently working(tunneling or setuping). Use downloadSessionCounter - downloadSessionChain.length to count busy
 
 const DownloadSessionListedCheck = () => {
-    console.log('Download Expired Check (Count: ' + downloadSessionChain.length + ') ' + new Date().toLocaleString());
+    //console.log('Download Expired Check (Count: ' + downloadSessionChain.length + ') ' + new Date().toLocaleString());
     //scan
-    DownloadSessionCheckDeadInChain(downloadSessionChain.head, downloadSessionExpireMinTime);
+    CheckExpiredSessionInChain(downloadSessionChain.head, downloadSessionExpireMinTime, CloseDownloadSession);
 };
 //launch checker
 setInterval(DownloadSessionListedCheck, downloadSessionExpireCheckTime);
@@ -241,9 +242,9 @@ setInterval(DownloadSessionListedCheck, downloadSessionExpireCheckTime);
 //this chain is used for tracking idleness
 const downloadSessionBusyChain = new ChainArray();
 const DownloadSessionIdleCheck = () => {
-    console.log('Download Idle Check (Count: ' + downloadSessionBusyChain.length + ') ' + new Date().toLocaleString());
+    //console.log('Download Idle Check (Count: ' + downloadSessionBusyChain.length + ') ' + new Date().toLocaleString());
     //scan
-    DownloadSessionCheckDeadInChain(downloadSessionBusyChain.head, downloadSessionIdleMinTime);
+    CheckExpiredSessionInChain(downloadSessionBusyChain.head, downloadSessionIdleMinTime, CloseDownloadSession);
 };
 //launch checker
 setInterval(DownloadSessionIdleCheck, downloadSessionIdleCheckTime);
@@ -396,6 +397,7 @@ const CloseDownloadSession = (session) => {
     if(session._isClosing)
         return;
     session._isClosing = true;
+    console.log('CLOSING DOWNLOAD SESSION');
     //check if it is listed
     //METHOD 3: NO CHAIN (SAFELY REMOVE FROM ALL CHAINS)
     //try to remove from the idle tracker
@@ -434,7 +436,9 @@ const DelistDownloadSession = (session) => {
 
 let uploadSessionCounter = 0;
 const uploadSessionChain = new ChainArray();
-    //.length won't include sessions currently working(tunneling). Use uploadSessionCounter - uploadSessionChain.length to count the working ones
+const uploadSessionBusyChain = new ChainArray();
+//.length won't include sessions currently working(tunneling). Use uploadSessionCounter - uploadSessionChain.length to count the working ones
+
 
 const GenerateUploadKey = () => GenerateKey(uploadSessionKeyLength);
 
@@ -486,6 +490,10 @@ const SetupUploadServiceSocket = (socket) => {
     //Cache chain properties
     socket.chainBack = null;
     socket.chainFront = null;
+    //Update Last Action Date
+    UpdateLastActionDate(socket);
+    //METHOD 1: FIRST CHAIN (FIRST CHAIN ASSIGN)
+    uploadSessionBusyChain.Add(socket);
 
     //on message
     socket.on("message", msg => {
@@ -507,7 +515,10 @@ const SetupUploadServiceSocket = (socket) => {
                 const key = GenerateUploadKey();
                 socket._key = key;
                 socket.send("key;" + key);
-                //add to chain
+                //Update Last Action Date
+                UpdateLastActionDate(socket);
+                //METHOD 2: CHAIN SWAP (REMOVE FROM THE OLD CHAIN => MOVE TO THE NEW CHAIN)
+                uploadSessionBusyChain.Remove(socket);
                 uploadSessionChain.Add(socket);
             }
         }
@@ -524,6 +535,8 @@ const SetupUploadServiceSocket = (socket) => {
                     CloseUploadSession(socket);
                     return;
                 }
+                //Update Last Action Date - only client
+                UpdateLastActionDate(socket._client);
                 //allow client to send the next chunk of file
                 socket._client._length = Math.min(socket._chunkLength, socket._maxLength - socket._length);
                 //send command
@@ -551,6 +564,9 @@ const SetupUploadClientSocket = (socket) => {
     socket._client._client = socket;
     //give permission to send data
     socket._length = socket._client._chunkLength;
+    //Update Last Action Date
+    UpdateLastActionDate(socket);
+    //
 
     //on message
     socket.on("message", message => {
@@ -569,6 +585,11 @@ const SetupUploadClientSocket = (socket) => {
         }
         //block permission
         socket._length = 0;
+
+        //Update Last Action Date + client
+        UpdateLastActionDate(socket);
+        UpdateLastActionDate(socket._client);
+
         //nomatter what the f he is sending
         //forward this chunk of data
         socket._client.send(message);
@@ -598,8 +619,13 @@ const CloseUploadSession = (session) => {
     if(session._isClosing)
         return;
     session._isClosing = true;
+    console.log('CLOSING UPLOAD SESSION');
     //check if it is listed
-    DelistUploadSession(session);
+    //METHOD 3: NO CHAIN (SAFELY REMOVE FROM ALL CHAINS)
+    if(!session._key)
+        uploadSessionBusyChain.Remove(session);
+    else
+        DelistUploadSession(session);
     //close client
     if(session._client){
         session._client.removeAllListeners();
@@ -619,6 +645,50 @@ const DelistUploadSession = (session) => {
         session._key = null;
     }
 };
+
+//idle checking stuff here:
+const UploadSessionIdleCheck = () => {
+    //console.log('Upload Idle Check (Count: ' + uploadSessionBusyChain.length + ') ' + new Date().toLocaleString());
+    //init vars
+    const current = new Date();
+    let temp = false;
+    let session = uploadSessionBusyChain.head;
+    let nextSession = null;
+    //scan
+    while(session){
+        nextSession = session.chainFront;
+        temp = true;
+        //check who could be idle
+        //client scenario
+        if(session._client)
+            if(session._client._length > 0){
+                //mark case
+                temp = false;
+                //client can be idle
+                if(current - session._client._lastActionDate > uploadSessionIdleClientMinTime)
+                    CloseUploadSession(session);
+            }
+        //check if client had to upload something
+        if(temp){
+            //source can be idle
+            if(current - session._lastActionDate > uploadSessionIdleDestinationMinTime)
+                CloseUploadSession(session);
+        }
+        //go to the next one
+        session = nextSession;
+    }
+};
+//launch checker
+setInterval(UploadSessionIdleCheck, uploadSessionIdleCheckTime)
+
+//listed checking stuff here
+UploadSessionListedCheck = () => {
+    //console.log('Upload Expired Check (Count: ' + uploadSessionChain.length + ') ' + new Date().toLocaleString());
+    //check
+    CheckExpiredSessionInChain(uploadSessionChain.head, uploadSessionExpireMinTime, CloseUploadSession);
+};
+//launch checker
+setInterval(UploadSessionListedCheck, uploadSessionExpireCheckTime);
 
 //#endregion
 
@@ -672,7 +742,9 @@ wsServer.on('connection', (socket, req) => {
                 socket._client = FindUploadSession(target);
                 if(socket._client){
                     //delist session
+                    //METHOD 2: CHAIN SWAP (REMOVE FROM THE OLD CHAIN => MOVE TO THE NEW CHAIN)
                     DelistUploadSession(socket._client);
+                    uploadSessionBusyChain.Add(socket._client);
                     //Setup the socket
                     SetupUploadClientSocket(socket);
                     return;
