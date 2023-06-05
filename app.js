@@ -7,36 +7,35 @@ This application is a tunnel between the private servers and the outside client.
 const serverPort = 80;
 //WS server
 const wsPort = serverPort;
-const wsMaxPayLoad = 2048;
+const wsMaxPayLoad = 4096;
 //Download Service
-const downloadServiceSecretKey = 'zaq1"WSX';
+const downloadServiceSecretKey = 'j4ouKwhzWQrB1LGgaHf1';
 const downloadSessionKeyLength = 16;
 const downloadSessionMaxCount = 8;
-const downloadSessionMaxChunkLength = 2048;
-const downloadSessionMinChunkLength = 128;
-const downloadSessionMaxFileSize = 9999999999999;
+const downloadSessionMaxChunkLength = wsMaxPayLoad;
+const downloadSessionMinChunkLength = 256;
+const downloadSessionMaxFileSize = 1073741824;
 //idle check
-const downloadSessionExpireMinTime = 15 * 1000;
-const downloadSessionExpireCheckTime = 20 * 1000;
-const downloadSessionIdleMinTime = 10 * 1000;
-const downloadSessionIdleCheckTime = 1 * 1000;
+const downloadSessionExpireMinTime = 30 * 1000;
+const downloadSessionExpireCheckTime = 15 * 1000;
+const downloadSessionIdleMinTime = 20 * 1000;
+const downloadSessionIdleCheckTime = 10 * 1000;
 //Upload Service
-const uploadServiceSecretKey = 'ZAQ!2wsx';
+const uploadServiceSecretKey = 'AinoWB7KMaCRpc19vV01';
 const uploadSessionKeyLength = 16;
-const uploadSessionMaxCount = 4;
-const uploadSessionMaxChunkLength = 2048;
-const uploadSessionMinChunkLength = 128;
-const uploadSessionMaxFileSize = 9999999999999;
+const uploadSessionMaxCount = 6;
+const uploadSessionMaxChunkLength = wsMaxPayLoad;
+const uploadSessionMinChunkLength = 256;
+const uploadSessionMaxFileSize = 1073741824;
 //idle check
-const uploadSessionExpireMinTime = 15 * 1000;
-const uploadSessionExpireCheckTime = 2 * 1000;
-const uploadSessionIdleDestinationMinTime = 10 * 1000;
+const uploadSessionExpireMinTime = 30 * 1000;
+const uploadSessionExpireCheckTime = 15 * 1000;
+const uploadSessionIdleDestinationMinTime = 20 * 1000;
 const uploadSessionIdleClientMinTime = 10 * 1000;
-const uploadSessionIdleCheckTime = 1 * 1000;
+const uploadSessionIdleCheckTime = 10 * 1000;
 //WS server delay checks
 //obsolete cause they should rely on the admin's side
 //WS client delay/error checks
-const maxClientDelayInMessage = 10 * 1000; 
 //client has strict rules, and should only message once whenever the tunnel message him.
 
 //Idle check should rely on 1 Timeout event for the whole chain
@@ -342,7 +341,7 @@ const SetupDownloadSocket = (socket) => {
             //generate the key
             if(!socket._key){
                 const key = GenerateDownloadKey();
-                console.log(key);
+                //console.log(key);
                 socket._key = key;
                 socket.send("key;" + key);
                 //register Action date
@@ -397,7 +396,7 @@ const CloseDownloadSession = (session) => {
     if(session._isClosing)
         return;
     session._isClosing = true;
-    console.log('CLOSING DOWNLOAD SESSION');
+    //console.log('CLOSING DOWNLOAD SESSION');
     //check if it is listed
     //METHOD 3: NO CHAIN (SAFELY REMOVE FROM ALL CHAINS)
     //try to remove from the idle tracker
@@ -619,7 +618,7 @@ const CloseUploadSession = (session) => {
     if(session._isClosing)
         return;
     session._isClosing = true;
-    console.log('CLOSING UPLOAD SESSION');
+    //console.log('CLOSING UPLOAD SESSION');
     //check if it is listed
     //METHOD 3: NO CHAIN (SAFELY REMOVE FROM ALL CHAINS)
     if(!session._key)
