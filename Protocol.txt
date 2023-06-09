@@ -179,11 +179,6 @@ Potential example plan of upload service for client.
     2. Check the demanded upload size
     3. Get the key, by calling
     *3. Return the access denied
-        1. Check the current cound of opened sessions
-        2. Check the file
-        3. Try to connect to the tunnel
-        4. Return the invite key
-        *4. Return the access denied
     4. Return the key
     *4. Return the access denied
 3. Get the Upload key

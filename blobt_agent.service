@@ -1,0 +1,14 @@
+[Unit]
+Description="BLOBTunnel-Agent"
+
+[Service]
+ExecStart=/usr/bin/node /var/www/blobt_agent/app_agent.js
+WorkingDirectory=/var/www/blobt_agent
+#Restart=always
+#RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=blobt_agent
+
+[Install]
+WantedBy=multi-user.target

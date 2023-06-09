@@ -2,3 +2,4 @@ node_modules/*
 boss/*
 base/*
 drafts/*
+*_config.json

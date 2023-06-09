@@ -1,36 +1,7 @@
-/*================================================================
-This application is an agent / a tool to communicate with the public tunnel, in order to establish some connection between private servers and the outside client.
-
-//================================================================*/
-//#region Config
-//IO
-const baseDir = 'base/';        //Directory with 777 access
-const readChunkLength = 1024;
-//API and Panel
-const serverPort = 6060;
-const apiPrefix = '/api/';
-const apiPrefixSubCount = apiPrefix.split('/').length;
-const panelPrefix = '/panel/';
-const panelDirPath = __dirname + '/Panel/';
-//Tunnel
-const tunnelURL = 'localhost';
-const tunnelUseSSL = false;
-const openedTransferMaxCount = 30;
-//Download Service
-const downloadServiceSecretKey = 'zaq1"WSX';
-//Upload Service
-const uploadServiceSecretKey = 'ZAQ!2wsx';
-const uploadServiceLockFiles = true;
-//Additional Callbacker
-const Boss = require('./boss/boss.js');
-//Used functions:
-//StartedDownloading(session)
-//FinishedDownloading(session)
-//StartedUploading(session)
-//FinishedUploading(session)
-
-//#endregion
-
+//================================================================
+//
+//This application is an agent / a tool to communicate with the public tunnel, in order to establish some connection between private servers and the outside client.
+//
 //================================================================
 //#region Requirements and consts
 
@@ -45,6 +16,45 @@ const RandomAccessFile = require('random-access-file');
 const { json } = require('express');
 const { rejects } = require('assert');
 const app = express();
+//#endregion
+
+//================================================================
+//#region Config
+
+//load config
+
+let temp = JSON.parse(fs.readFileSync('agent_config.json'));
+
+//IO
+const baseDir = temp.baseDir;        //Directory with 777 access
+const readChunkLength = temp.readChunkLength;
+//API and Panel
+const serverPort = temp.serverPort;
+const apiPrefix = temp.apiPrefix;
+const apiPrefixSubCount = apiPrefix.split('/').length;
+const panelPrefix = temp.panelPrefix;
+temp.panelDirPath = temp.panelDirPath.trim();
+if(temp.panelDirPath.indexOf('./') == 0)
+    temp.panelDirPath = __dirname + '/' + temp.panelDirPath.substring(2);
+const panelDirPath = temp.panelDirPath;
+//Tunnel
+const tunnelURL = temp.tunnel.address;
+const tunnelUseSSL = temp.tunnel.useSSL;
+//Download Service
+const downloadServiceSecretKey = temp.tunnel.download.key;
+//Upload Service
+const uploadServiceSecretKey = temp.tunnel.upload.key;
+const uploadServiceLockFiles = temp.tunnel.upload.lockFiles;
+//Additional Callbacker
+const Boss = require(temp.bossModulePath);
+//Used functions:
+//StartedDownloading(session)
+//FinishedDownloading(session)
+//StartedUploading(session)
+//FinishedUploading(session)
+//forget config
+temp = null;
+
 //#endregion
 
 //================================================================
