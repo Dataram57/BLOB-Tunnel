@@ -123,10 +123,16 @@ Agent API:
 --Form: TRUE/FALSE
 --Info: Kills a specific listed connection on a specific service.
 
-/startDownload/$targetFile/$fileName
+/startDownload/$config
 --Form: JSON
 --Info: Opens a download connection and handles the specific $targetFile transfer.
---Input: $targetFile and $fileName are encoded using JS encodeURIComponent function.
+--Input: $config are encoded using JS encodeURIComponent function.
+----$config contains JSON config
+------Config:
+        {
+            targetFile: STRING //file path of the file to transfer
+            ,fileName: STRING //output file name of the transfered file
+        }
 --Example:
     {
         key: STRING

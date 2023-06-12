@@ -114,8 +114,13 @@ const PanelHostDownload = () => {
     //disable
     InputFilePath.disabled = true;
     ButtonHostDownload.disabled = true;
+    //construct config
+    const config = {
+        targetFile: InputFilePath.value
+        ,fileName: InputFileName.value
+    };
     //call API
-    FetchGet('startDownload/' + encodeURIComponent(InputFilePath.value) + '/' + encodeURIComponent(InputFileName.value), (res) => {
+    FetchGet('startDownload/' + encodeURIComponent(JSON.stringify(config)), (res) => {
         //switch
         let msg = '';
         if(typeof(res) == 'object'){

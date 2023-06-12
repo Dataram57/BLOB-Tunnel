@@ -98,9 +98,7 @@ const ScanChainForSessionKey = (head, key) => {
     return null;
 };
 
-const ReadLastParameterFromURL = (url) => {
-    return decodeURIComponent(url.substring(url.lastIndexOf('/') + 1));
-};
+const ReadLastParameterFromURL = (url) => decodeURIComponent(url.substring(url.lastIndexOf('/') + 1));
 
 const ReadJSONConfigFromURL = (url) => {
     //trim
@@ -191,37 +189,47 @@ app.get(apiPrefix + 'list', function (req, res) {
     res.end('}');
 });
 
-//startDownload/$targetFile/$fileName
+//startDownload/$config
 app.get(apiPrefix + 'startDownload/*', async function (req, res) {
-    //check URL minimum
-    const args = req.url.split('/');
-    if(args.length < 2 + apiPrefixSubCount){
-        //error
-        res.send({error:'URL does not contain all the necessary arguments.'});
+    //read config
+    const config = ReadJSONConfigFromURL(req.url);
+    //check params types
+    if(typeof(config.targetFile) != 'string' || typeof(config.fileName) != 'string'){
+        res.send({error: 'Config is not in a right format.'});
         return;
     }
-    //read params
-    let filePath = decodeURIComponent(args[apiPrefixSubCount]);
-    const fileName = decodeURIComponent(args[apiPrefixSubCount + 1]);
-    //check params
-    if(fileName.trim().length == 0){ 
+    //check config parameters
+    if(config.fileName.trim().length == 0){ 
         //error
         res.send({error:'$fileName is empty.'});
         return;
     }
     //check file existance
     //1.check if path is direct
-    if(!await FileExists(filePath)){
+    if(!await FileExists(config.targetFile)){
         //2.check if path is relative
-        filePath = baseDir + filePath;
-        if(!await FileExists(filePath)){
+        config.targetFile = baseDir + config.targetFile;
+        if(!await FileExists(config.targetFile)){
             //error
             res.send({error:'File at $filePath does not exist.'});
             return;
         }
     }
     //create a tunnel
-    const response = await CreateDownloadSession(filePath, fileName);
+    const response = await CreateDownloadSession(config);
+    //Check Boss
+    if(response.key){
+        //ask boss
+        const problem = await Boss.DownloadStart(config);
+        if(problem){
+            //kill session
+            CloseDownloadSession(ScanChainForSessionKey(downloadSessionChain.head, response.key));
+            //send problem
+            res.send(problem);
+            return;
+        }
+    }
+    //send key
     res.send(response);
 });
 
@@ -272,10 +280,28 @@ app.get(apiPrefix + 'startUpload/*', async function (req, res) {
     }
     //correct the path
     config.outputPath = baseDir + config.outputPath;
+    //Boss
+    const problem = await Boss.UploadStart(config);
+    if(problem){
+        res.send(problem);
+        return;
+    }
     //try to open an upload session
-    const result = await CreateUploadSession(config);
-    //end
-    res.send(result);
+    const response = await CreateUploadSession(config);
+    //Check Boss
+    if(response.key){
+        //ask boss
+        const problem = await Boss.UploadStart(config);
+        if(problem){
+            //kill session
+            CloseUploadSession(ScanChainForSessionKey(uploadSessionChain.head, response.key));
+            //send problem
+            res.send(problem);
+            return;
+        }
+    }
+    //return result
+    res.send(response);
 });
 
 //killUpload/$key
@@ -344,13 +370,13 @@ const downloadSessionChain = new ChainArray();
 
 //Creates a download session
 //returns the JSON containing either a key or an error.
-const CreateDownloadSession = (targetFile, fileName) => {
+const CreateDownloadSession = (config) => {
     return new Promise(resolve => {
         //create a file reader
         //IMPORTANT: RandomAccessFile will only throw an error at reading
         //That's why it is important to make checks of the target file earlier
         //Or force it to do a check or throw an error
-        const fr = new RandomAccessFile(targetFile);
+        const fr = new RandomAccessFile(config.targetFile);
         fr.stat((err, stat) => {
             if(err){
                 resolve({error: "Couldn't read the file stats."});
@@ -375,7 +401,7 @@ const CreateDownloadSession = (targetFile, fileName) => {
             });
             //assign events and properties
             //metadata
-            socket._fileName = fileName;
+            socket._fileName = config.fileName;
             //file reading
             socket._fr = fr;                //File reader object
             socket._length = stat.size;     //Length of the file
@@ -470,6 +496,9 @@ const SetupDownloadSessionEvents = (socket) => {
 };
 
 const CloseDownloadSession = (socket) => {
+    //block null
+    if(!socket) 
+        return;
     //don't call it again
     if(socket._key === null)
         return;
@@ -716,6 +745,9 @@ const CreateUploadSession = (config) => {
 
 //safely closes the Upload session
 const CloseUploadSession = (socket) => {
+    //block null
+    if(!socket) 
+        return;
     //don't call it again
     if(socket._key === null)
         return;
