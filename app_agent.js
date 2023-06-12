@@ -220,7 +220,7 @@ app.get(apiPrefix + 'startDownload/*', async function (req, res) {
     //Check Boss
     if(response.key){
         //ask boss
-        const problem = await Boss.DownloadStart(config);
+        const problem = await Boss.DownloadStart(response.key, config);
         if(problem){
             //kill session
             CloseDownloadSession(ScanChainForSessionKey(downloadSessionChain.head, response.key));
@@ -291,7 +291,7 @@ app.get(apiPrefix + 'startUpload/*', async function (req, res) {
     //Check Boss
     if(response.key){
         //ask boss
-        const problem = await Boss.UploadStart(config);
+        const problem = await Boss.UploadStart(response.key, config);
         if(problem){
             //kill session
             CloseUploadSession(ScanChainForSessionKey(uploadSessionChain.head, response.key));
@@ -445,14 +445,15 @@ const SetupDownloadSessionEvents = (socket) => {
         //next
         else if(msg.subarray(0,5).toString() == 'next;'){
             //wants to send the next chunk of the data.
-            socket._fr.read(socket._offset, Math.min(readChunkLength, socket._length - socket._offset), (err, raw) => {
+            const step = Math.min(readChunkLength, socket._length - socket._offset);
+            socket._fr.read(socket._offset, step, (err, raw) => {
                 if(err){
                     console.log(err)
                 }
                 //send chunk
                 socket.send(raw);
                 //next
-                socket._offset += readChunkLength;
+                socket._offset += step;
                 //check if EOF
                 if(socket._offset >= socket._length)
                     //Finish Session.
@@ -502,8 +503,9 @@ const CloseDownloadSession = (socket) => {
     //don't call it again
     if(socket._key === null)
         return;
+    //remember the key
+    const key = socket._key;
     //mark as it is being closed
-    //console.log('Closing download session:',KeyToString(socket._key));
     socket._key = null;
     //remove events
     socket.removeAllListeners();
@@ -516,6 +518,12 @@ const CloseDownloadSession = (socket) => {
         //close WebSocket
         socket.close();
         //check if it had a resolver
+        //Boss
+        Boss.DownloadEnd({
+            key: key
+            ,length: socket._offset
+            ,maxLength: socket._length
+        });
     });
 };
 
@@ -564,7 +572,6 @@ const SetupUploadWriterEvents = (writer) => {
     writer.on('error', (err) => {
         console.error('Error writing file:', err);
         CloseUploadSession(writer._socket);
-        Boss;
     });
 
     //on finish or on close
@@ -652,22 +659,16 @@ const SetupUploadSessionEvents = (socket) => {
             SessionCheckResolver(socket, {error: "Couldn't get the key of the upload session."});
             //Close session
             CloseUploadSession(socket);
-            //Call the boss
-            Boss;
         }
         else if(socket._length < socket._maxLength){
             //The transfer was started, but there was a problem in the transfer
             //Close session
             CloseUploadSession(socket);
-            //Call the boss
-            Boss;
         }
         else{
             //The transfer has been finished, and more or equal of amount of demanded data has been transfered
             //Close session
             CloseUploadSession(socket);
-            //Call the boss
-            Boss;
         }
     });
 
@@ -682,22 +683,16 @@ const SetupUploadSessionEvents = (socket) => {
             SessionCheckResolver(socket, {error: "Couldn't get the key of the upload session."});
             //Close session
             CloseUploadSession(socket);
-            //Call the boss
-            Boss;
         }
         else if(socket._length < socket._maxLength){
             //The transfer was started, but there was a problem in the transfer
             //Close session
             CloseUploadSession(socket);
-            //Call the boss
-            Boss;
         }
         else{
             //The transfer has been finished, and more or equal of amount of demanded data has been transfered
             //Close session
             CloseUploadSession(socket);
-            //Call the boss
-            Boss;
         }
     });
 };
@@ -751,6 +746,8 @@ const CloseUploadSession = (socket) => {
     //don't call it again
     if(socket._key === null)
         return;
+    //remember the key
+    const key = socket._key;
     //mark as it is being closed
     socket._key = null;
     //remove events
@@ -763,6 +760,12 @@ const CloseUploadSession = (socket) => {
         uploadSessionChain.Remove(socket);
         //close WebSocket
         socket.close();
+        //Boss
+        Boss.UploadEnd({
+            key: key
+            ,length: socket._length
+            ,maxLength: socket._maxLength
+        });
     });
 };
 

@@ -35,8 +35,14 @@ const GetTunnelWSAddress = () => {
     return 'ws://' + tunnelAddress;
 };
 
+const GetTunnelHTTPAddress = () => {
+    if(tunnelUseSSL)
+        return 'https://' + tunnelAddress;
+    return 'http://' + tunnelAddress;
+};
+
 const GetTunnelUploadAddress = (key) => GetTunnelWSAddress() + tunnelUploadDir + key;
-const GetTunnelDownloadAddress = (key) => GetTunnelWSAddress() + tunnelDownloadDir + key;
+const GetTunnelDownloadAddress = (key) => GetTunnelHTTPAddress() + tunnelDownloadDir + key;
 
 //Fetch API without any callback
 const FetchAsyncGET = async (command) => {
@@ -135,8 +141,10 @@ const PanelHostDownload = () => {
                 //read error
                 if(res.error)
                     msg = res.error;
-                else if(res.key)
+                else if(res.key){
                     msg = 'Download Key: ' + GetCopyAbleHTMLText(res.key);
+                    msg += '<br>Click <a target="_blank" href="' + GetTunnelDownloadAddress(res.key) + '">here</a> to test this download.';
+                }
                 else
                     msg = "Response does not contain neither a key, nor an error.";
             }
