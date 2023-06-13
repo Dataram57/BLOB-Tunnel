@@ -193,6 +193,11 @@ app.get(apiPrefix + 'list', function (req, res) {
 app.get(apiPrefix + 'startDownload/*', async function (req, res) {
     //read config
     const config = ReadJSONConfigFromURL(req.url);
+    //check if JSON
+    if(!config){
+        res.send({error: 'Config is not in a right format.'});
+        return;
+    }
     //check params types
     if(typeof(config.targetFile) != 'string' || typeof(config.fileName) != 'string'){
         res.send({error: 'Config is not in a right format.'});
@@ -258,6 +263,11 @@ app.get(apiPrefix + 'killDownload/*', function (req, res) {
 app.get(apiPrefix + 'startUpload/*', async function (req, res) {
     //read config
     const config = ReadJSONConfigFromURL(req.url);
+    //check if JSON
+    if(!config){
+        res.send({error: 'Config is not in a right format.'});
+        return;
+    }
     //check config parameters
     if(typeof(config.outputPath) != 'string' || typeof(config.chunkLength) != 'number' || typeof(config.maxFileSize) != 'number'){
         res.send({error: 'Config is not in a right format.'});
