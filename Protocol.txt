@@ -165,6 +165,39 @@ Agent API:
         error: STRING //Failure cause
     }
 
+//----------------------------------------------------------------
+Boss callbacks:
+
+Functions:
+    DownloadStart(key, config) //Return ANY to close a session.
+    DownloadEnd(state)
+    UploadStart(key, config) //Return ANY to close a session.
+    UploadEnd(state)
+Parameters:
+    key: STRING //Key of the newly established session
+    config: JSON //Config containing info about the session
+    state: JSON //Ending state of the session
+        Form:
+            {
+                key: STRING
+                length: INT
+                maxLength: INT
+            }
+        Interpretation:
+            If lenght < 0:
+                If lenght == -1:
+                    meaning: Session has been expired.
+                else    //ex: lenght == -2
+                    //Impossible
+                    meaning: Couldn't get the key from the tunnel.
+            ElseIf lenght < maxLength:
+                meaning: The connection has been closed during the proccess(either by client or the tunnel).
+            ElseIf lenght == maxLength:
+                meaning: The transfer went ok.
+            Else:
+                //Impossible
+                meaning:BLOBTA written more than it should.
+    
 ================================================================
 Potential example plan for download service for client.
 
