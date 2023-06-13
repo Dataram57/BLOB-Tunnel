@@ -405,7 +405,7 @@ const CreateDownloadSession = (config) => {
             //file reading
             socket._fr = fr;                //File reader object
             socket._length = stat.size;     //Length of the file
-            socket._offset = 0;             //current file offset (must be < _length)
+            socket._offset = -1;             //current file offset (must be < _length)
             //state
             socket._key = '';               //invitation key
             socket._resolver = resolve;     //called once and only when key is recieved
@@ -444,6 +444,9 @@ const SetupDownloadSessionEvents = (socket) => {
         }
         //next
         else if(msg.subarray(0,5).toString() == 'next;'){
+            //correct info for future state
+            if(socket._offset < 0)
+                socket._offset = 0;
             //wants to send the next chunk of the data.
             const step = Math.min(readChunkLength, socket._length - socket._offset);
             socket._fr.read(socket._offset, step, (err, raw) => {
@@ -598,7 +601,7 @@ const SetupUploadSessionEvents = (socket) => {
         if(socket._key === null)
             return;
         //check if writing began
-        if(socket._length < 0){
+        if(socket._length == -2){
             //The client has not started uploading yet
             //The tunnel may now return only commands
             //key
@@ -608,10 +611,13 @@ const SetupUploadSessionEvents = (socket) => {
                 //call the callback
                 SessionCheckResolver(socket, {key: socket._key});
                 //listen for chunks
-                socket._length = 0;
+                socket._length = -1;
             }
         }
         else{
+            //correct info for future state
+            if(socket._length < 0)
+                socket._length = 0;
             //The client is ready for responding
             //Tunnel sends only client's chunk
             //calculate left length
@@ -723,7 +729,7 @@ const CreateUploadSession = (config) => {
                 socket._fw = writeStream;                   //File writer object
                 socket._chunkLength = config.chunkLength;   //Length of a single chunk
                 socket._maxLength = config.maxFileSize;     //Max length of the file
-                socket._length = -1;                        //current length of the written date ((< maxLength) means it needs. (= maxLength) means it has filled up all the data)
+                socket._length = -2;                        //current length of the written date ((< maxLength) means it needs. (= maxLength) means it has filled up all the data)
                 //state
                 socket._key = '';                           //invitation key
                 socket._resolver = resolve;                 //called once and only when key is recieved
