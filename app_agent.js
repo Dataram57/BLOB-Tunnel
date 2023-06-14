@@ -77,6 +77,12 @@ const GetWebSocketURL = () => {
     return 'ws:' + tunnelURL; 
 };
 
+const GetHttpUrl = () => {
+    if(tunnelUseSSL)
+        return 'https://' + tunnelURL;
+    return 'http://' + tunnelURL; 
+};
+
 const GetRAFTargetFile = (raf) => {
     if(raf.directory)
         return raf.directory + raf.filename;
@@ -234,6 +240,8 @@ app.get(apiPrefix + 'startDownload/*', async function (req, res) {
             return;
         }
     }
+    //add parameters to this key
+    response.fullAddress = GetHttpUrl() + "/download/" + response.key;
     //send key
     res.send(response);
 });
@@ -310,6 +318,8 @@ app.get(apiPrefix + 'startUpload/*', async function (req, res) {
             return;
         }
     }
+    //add parameters to this key
+    response.fullAddress = GetWebSocketURL + "/upload/" + response.key;
     //return result
     res.send(response);
 });

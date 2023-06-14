@@ -136,6 +136,7 @@ Agent API:
 --Example:
     {
         key: STRING
+        fullAddress: STRING //Full address with key
     }
 --Example2:
     {
