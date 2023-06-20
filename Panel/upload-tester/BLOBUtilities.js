@@ -67,7 +67,7 @@ const BLOBUtilities = {
                 this.socket.close();
             //call event
             //check if was successful
-            if(blobTunnel.fileSize == blobTunnel.fileOffset)
+            if(this.fileSize == this.fileOffset)
                 this.onfinish();
             else
                 this.onerror();

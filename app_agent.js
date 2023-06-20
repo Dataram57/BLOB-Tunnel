@@ -319,7 +319,7 @@ app.get(apiPrefix + 'startUpload/*', async function (req, res) {
         }
     }
     //add parameters to this key
-    response.fullAddress = GetWebSocketURL + "/upload/" + response.key;
+    response.fullAddress = GetWebSocketURL() + "/upload/" + response.key;
     //return result
     res.send(response);
 });
