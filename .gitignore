@@ -4,3 +4,5 @@ base/*
 drafts/*
 *_config.json
 dev/*
+package-lock.json
+package.json

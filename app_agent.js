@@ -47,11 +47,8 @@ const uploadServiceSecretKey = temp.tunnel.upload.key;
 const uploadServiceLockFiles = temp.tunnel.upload.lockFiles;
 //Additional Callbacker
 const Boss = require(temp.bossModulePath);
-//Used functions:
-//StartedDownloading(session)
-//FinishedDownloading(session)
-//StartedUploading(session)
-//FinishedUploading(session)
+//pass the config to the boss
+Boss.Init(temp);
 //forget config
 temp = null;
 
