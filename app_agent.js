@@ -227,8 +227,10 @@ app.get(apiPrefix + 'startDownload/*', async function (req, res) {
     const response = await CreateDownloadSession(config);
     //Check Boss
     if(response.key){
+        //create Boss note
+        response.session._bossNote = {};
         //ask boss
-        const problem = await Boss.DownloadStart(response.key, config);
+        const problem = await Boss.DownloadStart(response.session._bossNote, config);
         if(problem){
             //kill session
             CloseDownloadSession(ScanChainForSessionKey(downloadSessionChain.head, response.key));
@@ -237,6 +239,8 @@ app.get(apiPrefix + 'startDownload/*', async function (req, res) {
             return;
         }
     }
+    //avoid ciruclaration
+    response.session = undefined;
     //add parameters to this key
     response.fullAddress = GetHttpUrl() + "/download/" + response.key;
     //send key
@@ -295,18 +299,14 @@ app.get(apiPrefix + 'startUpload/*', async function (req, res) {
     }
     //correct the path
     config.outputPath = baseDir + config.outputPath;
-    //Boss
-    const problem = await Boss.UploadStart(config);
-    if(problem){
-        res.send(problem);
-        return;
-    }
     //try to open an upload session
     const response = await CreateUploadSession(config);
     //Check Boss
     if(response.key){
+        //create Boss note
+        response.session._bossNote = {};
         //ask boss
-        const problem = await Boss.UploadStart(response.key, config);
+        const problem = await Boss.UploadStart(response.session._bossNote, config);
         if(problem){
             //kill session
             CloseUploadSession(ScanChainForSessionKey(uploadSessionChain.head, response.key));
@@ -315,6 +315,8 @@ app.get(apiPrefix + 'startUpload/*', async function (req, res) {
             return;
         }
     }
+    //avoid ciruclaration
+    response.session = undefined;
     //add parameters to this key
     response.fullAddress = GetWebSocketURL() + "/upload/" + response.key;
     //return result
@@ -457,7 +459,10 @@ const SetupDownloadSessionEvents = (socket) => {
             //key is not set yet or has changed
             socket._key = msg.subarray(4).toString();
             //call the callback
-            SessionCheckResolver(socket, {key: socket._key});
+            SessionCheckResolver(socket, {
+                key: socket._key
+                ,session: socket
+            });
         }
         //next
         else if(msg.subarray(0,5).toString() == 'next;'){
@@ -540,7 +545,7 @@ const CloseDownloadSession = (socket) => {
         //check if it had a resolver
         //Boss
         Boss.DownloadEnd({
-            key: key
+            bossNote: socket._bossNote
             ,length: socket._offset
             ,maxLength: socket._length
         });
@@ -626,7 +631,10 @@ const SetupUploadSessionEvents = (socket) => {
                 //key is not set yet or has changed
                 socket._key = msg.subarray(4).toString();
                 //call the callback
-                SessionCheckResolver(socket, {key: socket._key});
+                SessionCheckResolver(socket, {
+                    key: socket._key
+                    ,session: socket
+                });
                 //listen for chunks
                 socket._length = -1;
             }
@@ -785,7 +793,7 @@ const CloseUploadSession = (socket) => {
         socket.close();
         //Boss
         Boss.UploadEnd({
-            key: key
+            bossNote: socket._bossNote
             ,length: socket._length
             ,maxLength: socket._maxLength
         });

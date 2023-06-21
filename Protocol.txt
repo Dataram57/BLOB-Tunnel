@@ -171,18 +171,18 @@ Boss callbacks:
 
 Functions:
     ApplyConfig(agentConfig)
-    DownloadStart(key, sessionConfig) //Return ANY to close a session.
+    DownloadStart(bossNote, sessionConfig) //Return ANY to close a session.
     DownloadEnd(state)
-    UploadStart(key, sessionConfig) //Return ANY to close a session.
+    UploadStart(bossNote, sessionConfig) //Return ANY to close a session.
     UploadEnd(state)
 Parameters:
     agentConfig: JSON //Config of the agent
-    key: STRING //Key of the newly established session
+    bossNote: JSON //Additional JSON object to keep boss additional info
     sessionConfig: JSON //Config containing info about the session
     state: JSON //Ending state of the session
         Form:
             {
-                key: STRING
+                bossNote: JSON
                 length: INT
                 maxLength: INT
             }
