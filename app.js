@@ -112,6 +112,25 @@ const CheckExpiredSessionInChain = (chainHead, minTime, funcClose) => {
     }
 };
 
+const GenerateUniqueKey = (keyLength, chainHead) => {
+    //generates a key that no listed session will have
+    let key = '';
+    let session = null;
+    do{
+        //generate
+        key = GenerateKey(keyLength);
+        //search
+        session = chainHead;
+        while(session)
+            if(session._key == key)
+                break;
+            else
+                session = session.chainFront;
+    }while(session)
+    //key is unique
+    return key;
+};
+
 //#endregion
 
 //================================================================
@@ -248,24 +267,7 @@ const DownloadSessionIdleCheck = () => {
 //launch checker
 setInterval(DownloadSessionIdleCheck, downloadSessionIdleCheckTime);
 
-const GenerateDownloadKey = () => {
-    //generates a key that no listed session will have
-    let key = '';
-    let session = null;
-    do{
-        //generate
-        key = GenerateKey(downloadSessionKeyLength);
-        //search
-        session = downloadSessionChain.head;
-        while(session)
-            if(session._key == key)
-                break;
-            else
-                session = session.chainFront;
-    }while(session)
-    //key is unique
-    return key;
-};
+const GenerateDownloadKey = () => GenerateUniqueKey(downloadSessionKeyLength, downloadSessionChain.head);
 
 const CheckDownloadKey = (key) => {
     if(typeof(key) == 'string')
@@ -438,8 +440,7 @@ const uploadSessionChain = new ChainArray();
 const uploadSessionBusyChain = new ChainArray();
 //.length won't include sessions currently working(tunneling). Use uploadSessionCounter - uploadSessionChain.length to count the working ones
 
-
-const GenerateUploadKey = () => GenerateKey(uploadSessionKeyLength);
+const GenerateUploadKey = () => GenerateUniqueKey(uploadSessionKeyLength, uploadSessionChain.head);
 
 const FindUploadSession = (key) => {
     let socket = uploadSessionChain.head;
