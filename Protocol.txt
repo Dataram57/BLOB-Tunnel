@@ -170,7 +170,7 @@ Agent API:
 Boss callbacks:
 
 Functions:
-    Init(agentConfig)
+    ApplyConfig(agentConfig)
     DownloadStart(key, sessionConfig) //Return ANY to close a session.
     DownloadEnd(state)
     UploadStart(key, sessionConfig) //Return ANY to close a session.

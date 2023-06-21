@@ -48,7 +48,7 @@ const uploadServiceLockFiles = temp.tunnel.upload.lockFiles;
 //Additional Callbacker
 const Boss = require(temp.bossModulePath);
 //pass the config to the boss
-Boss.Init(temp);
+Boss.ApplyConfig(temp);
 //forget config
 temp = null;
 
