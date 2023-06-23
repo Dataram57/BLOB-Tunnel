@@ -119,7 +119,9 @@ const SessionCheckResolver = (session, returnValue) => {
     if(session._resolver){
         session._resolver(returnValue);
         session._resolver = undefined;
+        return true;
     }
+    return false;
 };
 
 //#endregion
@@ -225,6 +227,11 @@ app.get(apiPrefix + 'startDownload/*', async function (req, res) {
     }
     //create a tunnel
     const response = await CreateDownloadSession(config);
+    //Check error
+    if(response.error){
+        res.send(response);
+        return;
+    }
     //Check Boss
     if(response.key){
         //create Boss note
@@ -239,6 +246,7 @@ app.get(apiPrefix + 'startDownload/*', async function (req, res) {
             return;
         }
     }
+    //Everything went ok with creating a session
     //avoid ciruclaration
     response.session = undefined;
     //add parameters to this key
@@ -301,6 +309,11 @@ app.get(apiPrefix + 'startUpload/*', async function (req, res) {
     config.outputPath = baseDir + config.outputPath;
     //try to open an upload session
     const response = await CreateUploadSession(config);
+    //Check error
+    if(response.error){
+        res.send(response);
+        return;
+    }
     //Check Boss
     if(response.key){
         //create Boss note
@@ -315,6 +328,7 @@ app.get(apiPrefix + 'startUpload/*', async function (req, res) {
             return;
         }
     }
+    //Everything went ok with creating a session
     //avoid ciruclaration
     response.session = undefined;
     //add parameters to this key

@@ -187,6 +187,8 @@ Parameters:
                 maxLength: INT
             }
         Interpretation:
+            If !!bossNote:
+                meaning: Couldn't connect to the tunnel.
             If lenght < 0:
                 If lenght == -1:
                     meaning: Session has been expired.
