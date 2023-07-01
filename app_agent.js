@@ -221,7 +221,7 @@ app.get(apiPrefix + 'startDownload/*', async function (req, res) {
         config.targetFile = baseDir + config.targetFile;
         if(!await FileExists(config.targetFile)){
             //error
-            res.send({error:'File at $filePath does not exist.'});
+            res.send({error:'File at $targetFile does not exist.'});
             return;
         }
     }
