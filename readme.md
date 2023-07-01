@@ -1,5 +1,5 @@
 # About
-This is a self-hosted application that allows you to transfer BLOBs through a public service (BLOB Tunnel) between a client (Web-Browser, or any) and a service running privately (BLOB Tunnel Agent). The tool is based on WS and HTTP communication, and have currently 2 ways of transfers:
+This is a self-hosted application that allows you to transfer BLOBs through a public service (**BLOB Tunnel**) between a client (Web-Browser, or any) and a service running privately (**BLOB Tunnel Agent**). The tool is based on WS and HTTP communication, and have currently 2 ways of transfers:
 - Download ( **Agent** --*WS*-- **Tunnel** --*HTTP*-> **Client**)
 - Upload ( **Agent** --*WS*-- **Tunnel** --*WS*-- **Client**)
 ## Story
